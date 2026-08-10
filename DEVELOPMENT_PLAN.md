@@ -240,16 +240,41 @@ connect(&a, &DApplication::newInstanceStarted, this, [this]() {
 
 ---
 
-## 七、AI 辅助环节（活动硬要求截图）
+## 七、AI 辅助环节（活动硬要求）
 
-比赛要求提供「AI 编程工具中调用 deepin Skills 的对话记录截图」，在以下环节调用 `dtk-development` skill 并截图：
+> 比赛要求：**基于 deepin Skills 完成开发，并在材料里说明用了哪些 Skill 模块**，并附「AI 编程工具中调用 deepin Skills 的对话记录截图」。
+> Skills 仓库：https://github.com/linuxdeepin/deepin-skills
 
-1. 环形进度控件（`DCircleProgress` 用法核对）
-2. 主题跟随实现（`DPalette` + `DGuiApplicationHelper`）
-3. DTK 窗口效果（磨砂 + 圆角，以 `references/widgets/blur-effect.md` 为准核对 API）
-4. 单实例 + 托盘
-5. deb 打包配置（`debian/control`）
-6. 编译排错（DTK6/Qt6 头文件缺失、CMake 找包失败等）
+### 7.1 使用的 Skill 模块清单
+
+DeskMon 定位为 DTK 原生桌面应用（方向三），全部开发基于 **`dtk-development`** 这一个 Skill 模块完成（仓库另有 `dde-shell-development` / `dde-control-center-development` / `dde-tray-development` 三个面向 Shell/控制中心/托盘插件的项目，本作品不是插件、未使用）。
+
+`dtk-development` 模块下实际调用并落地的 references 文档如下（每项均可在源码中核对）：
+
+| references 文档 | 对应DeskMon 功能 | 代码位置 |
+|------|------|------|
+| `references/widgets/application.md` | `DApplication` 入口、`setSingleInstance` 单实例、`newInstanceStarted` 激活已有窗口 | `main.cpp:6,62,72,89` |
+| `references/widgets/window.md` | 主悬浮窗选型 `DWidget`（放弃 `DMainWindow`，因强加最小尺寸不适合无边框小窗） | `src/monitorwidget.h:29-33`、`src/monitorwidget.cpp:85` |
+| `references/widgets/blur-effect.md` | `DBlurEffectWidget` 承担磨砂+圆角、`AutoColor` 遮罩跟随主题 | `src/monitorwidget.cpp:21,122,128,130` |
+| `references/widgets/progress.md` | `DProgressBar` 紧凑指标条（`MetricRow`） | `src/widgets/metricrow.h:8,35`、`src/widgets/metricrow.cpp:51` |
+| `references/widgets/dialog.md` | `DDialog` 原生设置面板 / GPU 显存管理 / 进程管理对话框 | `src/settings_dialog.cpp:20-31`、`src/gpu_dialog.cpp:23-30`、`src/process_dialog.h:7` |
+| `references/widgets/view.md` | `DTableWidget` 进程表 / 显存占用表 | `src/gpu_dialog.h:8,38`、`src/process_dialog.cpp:70` |
+| `references/theme/palette.md` | `DPalette::Highlight` 派生各指标配色，`DPaletteHelper` 语义化设色 | `src/themecolors.cpp:6-15`、`src/widgets/metricrow.h:18` |
+| `references/theme/theme-switch.md` | `themeTypeChanged` 联动刷新指标色/分隔线/标签色 | `src/monitorwidget.cpp:95` |
+| `references/utilities/gui-helper.md` | `DGuiApplicationHelper::setPaletteType(DarkType/LightType)` 主动同步明暗 | `main.cpp:32,36`、`src/themecolors.cpp:13` |
+| `references/utilities/dbus.md` | 监听 `org.deepin.dde.Appearance1.Changed` 信号补 DTK 不自动跟随 GlobalTheme 之缺陷 | `main.cpp:18-20,81-83` |
+| `references/utilities/desktop-services.md` | `DUtil::DNotifySender` 番茄钟完成通知 / CPU·GPU 阈值告警 | `src/widgets/pomodoro.cpp:194,206`、`src/monitorwidget.cpp:559` |
+| `references/app-dev-with-dtk.md` | CMake 工程骨架、`find_package(Dtk6Core/Gui/Widget)`、`debian/control` 模板 | `CMakeLists.txt:17-20`、`debian/control` |
+| `references/dtksrc-compile-debug.md` | jm-prefix 工具链断链重定向、`DObject`/`DThemeManager` 转发头补齐、`DLogManager` 破坏事件循环的定位 | 见 §环境备忘 + §8.2 排错 |
+
+### 7.2 需附对话截图的环节（按活动硬要求）
+
+1. 悬浮窗 + 磨砂圆角（`widgets/window.md` + `blur-effect.md`）
+2. 主题跟随实现（`theme/palette.md` + `utilities/gui-helper.md` + `utilities/dbus.md`）
+3. 进度条 / 对话框 / 表格控件选型（`widgets/{progress,dialog,view}.md`）
+4. 单实例 + 系统通知（`widgets/application.md` + `utilities/desktop-services.md`）
+5. deb 打包配置（`app-dev-with-dtk.md` 的 `debian/control` 模板）
+6. 编译排错（DTK6/Qt6 头文件缺失、CMake 找包失败、`DLogManager` 破坏事件循环）
 
 ---
 
