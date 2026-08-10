@@ -12,6 +12,7 @@ class QTimer;
 class QLabel;
 class QVBoxLayout;
 class QToolButton;
+class QFrame;
 class SystemMonitor;
 class Config;
 class MetricRow;
@@ -86,6 +87,10 @@ private:
     Pomodoro *m_pomodoro = nullptr;     // 番茄钟（加分项，默认隐藏）
     PowerIcon *m_titleIcon = nullptr;   // 标题电力图标（金色）
     QToolButton *m_opacityBtn = nullptr; // 标题 ◐ 透明度切换
+
+    QFrame *m_titleSep = nullptr;       // 标题与指标区分隔线
+    QFrame *m_metricsSep = nullptr;     // 指标区与趋势区分隔线
+    QFrame *m_netSep = nullptr;         // 网络区与番茄钟分隔线
 
     bool m_gpuAvailable = false;
     bool m_cpuAlerted = false;          // 告警边沿状态

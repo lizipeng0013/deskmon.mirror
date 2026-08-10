@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DeskMon 符号图标（symbolic，单色剪影，自动跟随主题前景色）
+  用于：系统通知、高对比度模式、暗色主题托盘
+  用法：Qt 加载后 setPalette(QPalette::WindowText) 着色
+-->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- 仪表盘弧形 -->
+  <path d="M 70 186 A 80 80 0 1 1 186 186"
+        fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" opacity="0.4"/>
+  <!-- 进度弧（约 70%） -->
+  <path d="M 128 48 A 80 80 0 1 1 72 176"
+        fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round"/>
+  <!-- 闪电剪影 -->
+  <path d="M 138 92 L 110 132 L 128 132 L 118 168 L 150 124 L 132 124 L 142 92 Z"
+        fill="currentColor"/>
+</svg>

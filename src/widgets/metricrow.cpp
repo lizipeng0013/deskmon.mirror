@@ -20,16 +20,18 @@ MetricRow::MetricRow(const QString &title, const QColor &color, QWidget *parent)
 
     m_title = new QLabel(title, this);
     QFont titleFont = m_title->font();
+    titleFont.setBold(true);
     titleFont.setPointSizeF(titleFont.pointSizeF() - 1);
     m_title->setFont(titleFont);
 
     // 百分比（用指标色强调）
     m_percent = new QLabel(QStringLiteral("0%"), this);
     QFont percentFont = m_percent->font();
+    percentFont.setBold(true);
     percentFont.setPointSizeF(percentFont.pointSizeF() - 1);
     m_percent->setFont(percentFont);
 
-    // 附加信息（温度/容量）
+    // 附加信息（温度/容量）—— 小字、提示色
     m_info = new QLabel(this);
     QFont infoFont = m_info->font();
     infoFont.setPointSizeF(infoFont.pointSizeF() - 2);
@@ -42,7 +44,7 @@ MetricRow::MetricRow(const QString &title, const QColor &color, QWidget *parent)
     head->addWidget(m_title);
     head->addStretch();
     head->addWidget(m_percent);
-    head->addSpacing(2);
+    head->addSpacing(4);
     head->addWidget(m_info);
 
     // 细进度条（不显示文字，颜色由 Highlight 角色控制）
@@ -54,8 +56,8 @@ MetricRow::MetricRow(const QString &title, const QColor &color, QWidget *parent)
     m_bar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 2, 4, 2);
-    layout->setSpacing(2);
+    layout->setContentsMargins(4, 1, 4, 1);
+    layout->setSpacing(1);
     layout->addLayout(head);
     layout->addWidget(m_bar);
 
@@ -68,6 +70,13 @@ void MetricRow::setColor(const QColor &color)
     const QString css = QStringLiteral("color: %1;").arg(color.name());
     m_dot->setStyleSheet(css + QStringLiteral(" font-size: 8px;"));
     m_percent->setStyleSheet(css);
+
+    // 标题用主题标题色，附加信息用提示色（自动跟随明/暗主题）
+    DPalette textPal = DPaletteHelper::instance()->palette(this);
+    const QColor titleColor = textPal.color(DPalette::TextTitle);
+    const QColor tipsColor = textPal.color(DPalette::TextTips);
+    m_title->setStyleSheet(QStringLiteral("color: %1;").arg(titleColor.isValid() ? titleColor.name() : QStringLiteral("#303133")));
+    m_info->setStyleSheet(QStringLiteral("color: %1;").arg(tipsColor.isValid() ? tipsColor.name() : QStringLiteral("#909399")));
 
     // 进度条 Highlight 角色（DTK 语义化方式）
     DPalette pal = DPaletteHelper::instance()->palette(m_bar);

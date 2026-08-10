@@ -159,7 +159,7 @@ deskmon-dtk/
 | 构建 | CMake，仅 DTK6/Qt6 | 集中精力冲方向三；避免双版本分支稀释工期（如后续有需求再补 DTK5） |
 | GPU 数据 | `QProcess` 调 `nvidia-smi --query-gpu=...` | 原版 psutil 同逻辑 |
 | 进程数据 | 读 `/proc/[pid]` 或 `ps` | Linux 原生 |
-| 主题 | `DPalette` + `DStyle` | 指标色由系统活跃色派生（`themecolors.h`），明暗主题自动调亮度 |
+| 主题 | `DPalette` + `DGuiApplicationHelper::setPaletteType` + DBus 监听 | 指标色由系统活跃色派生（`themecolors.h`），明暗主题自动调亮度；DTK 默认不跟随 DDE GlobalTheme，需通过 DBus 监听 `org.deepin.dde.Appearance1.Changed` 信号手动同步 `paletteType` |
 | 进度控件 | 每项一行 `MetricRow`（`DProgressBar` 细条 + 百分比 + 附加信息） | 实测经验：环形太占高度，长条更紧凑 |
 | 单实例 | `DApplication::setSingleInstance("deskmon")` | |
 | 窗口 | `DWidget` + `DBlurEffectWidget` 悬浮窗 | **改选**：DMainWindow 面向带标题栏/侧栏标准应用，强加最小尺寸，不适合无边框悬浮小窗；磨砂+圆角由 DBlurEffectWidget 承担 |
@@ -181,22 +181,30 @@ app.setProductName("DeskMon");
 DPalette palette = DGuiApplicationHelper::instance()->applicationPalette();
 QColor titleColor = palette.color(DPalette::TextTitle);
 
-// 主题切换监听
+// DDE GlobalTheme 跟随（DApplication 默认不自动跟随，需手动同步）
+#include <QDBusInterface>
+#include <QDBusConnection>
+// 1. 启动时同步：读 org.deepin.dde.Appearance1.GlobalTheme/GtkTheme
+//    判断含 "dark" → DGuiApplicationHelper::setPaletteType(DarkType/LightType)
+// 2. 运行时监听 Changed 信号（ty 是小写 "globaltheme"/"gtk"，需 CaseInsensitive 比较）
+
+// 主题切换监听（setPaletteType 触发，联动更新指标色/分隔线/标签色）
 connect(DGuiApplicationHelper::instance(),
         &DGuiApplicationHelper::themeTypeChanged,
         this, &MyWidget::onThemeChanged);
 
-// 环形进度
-#include <DCircleProgress>
-auto *ring = new DCircleProgress(this);
-ring->setValue(75);
+// 系统通知（DNotifySender，无边框悬浮窗可靠）
+#include <DNotifySender>
+DUtil::DNotifySender("DeskMon 告警")
+    .appName("DeskMon").appIcon("deskmon")
+    .appBody("CPU 超过阈值").timeOut(3000).call();
 
-// 消息提示（DFloatingMessage 需实例化后 show，非全局函数）
-#include <DFloatingMessage>
-auto *msg = new DFloatingMessage(DFloatingMessage::ResidentType, this);
-msg->setIcon(QIcon());
-msg->setMessage("CPU 使用率超过 90%");
-msg->show();
+// 属性动画（番茄钟呼吸脉动）
+#include <QPropertyAnimation>
+auto *anim = new QPropertyAnimation(icon, "pulseScale", this);
+anim->setDuration(1000);
+anim->setStartValue(1.0); anim->setEndValue(1.12);
+anim->setEasingCurve(QEasingCurve::InOutSine);
 
 // 窗口效果（确切 API 以 references/widgets/blur-effect.md 为准）
 // setWindowRadius / setEnableBlurWindow / setTranslucentBackground
@@ -319,7 +327,9 @@ install(FILES icons/deskmon.svg
 - [x] 实现迷你折线图（加分项，CPU/GPU 60s 趋势）
 - [x] 实现主题自动跟随（加分项）
 - [x] 实现阈值告警（加分项，边沿触发 + 系统通知）
-- [x] 设计矢量图标（`icons/deskmon.svg`；多尺寸 PNG 待 deb 打包时生成）
+- [x] 设计矢量图标（`icons/deskmon.svg` + `deskmon-tray.svg` + `deskmon-symbolic.svg`；多尺寸 PNG 已生成）
+- [x] 快速启动脚本（`start.sh`：build/run/clean 三模式）
+- [x] 标题栏隐藏按钮（✕ 隐藏到托盘）
 - [ ] deb 打包
 - [ ] 录演示视频、截图
 - [ ] 论坛发帖提交
@@ -343,11 +353,42 @@ install(FILES icons/deskmon.svg
   - 番茄钟（25/5 自动轮换 + 系统通知）
   - 阈值告警（CPU/GPU > 90% 边沿触发 + 系统通知；原 DFloatingMessage 在无边框悬浮窗不渲染，改用 DNotifySender）
   - 网络区域只显示本机 IP（默认路由接口，过滤 docker 桥接）
-  - **主题跟随修复**：`DBlurEffectWidget` 遮罩改 `AutoColor`（之前固定深色遮罩，在亮色主题系统上不跟随）；标题圆点/折线颜色随活跃色实时更新
-  - **UI 美化**：标题区精简（活跃色圆点+加粗应用名）、折线渐变填充、进度条加粗、间距优化
+  - **主题跟随修复（第一轮）**：`DBlurEffectWidget` 遮罩改 `AutoColor`（之前固定深色遮罩，在亮色主题系统上不跟随）；标题圆点/折线颜色随活跃色实时更新
+  - **UI 美化（第一轮）**：标题区精简（活跃色圆点+加粗应用名）、折线渐变填充、进度条加粗、间距优化
 - **代码量**：约 2700 行（27 个源文件，含 CMakeLists）
 
+### 2026-08-10（同日二更）· UI 精细化 + 主题跟随深度修复
+- **UI 美化（第二轮，6 项）**：
+  - **模块分区**：标题/指标区、指标区/折线图、网络区/番茄钟间增加 3 条 `DPalette::FrameBorder` 色分隔线，边距统一 `16,14,16,12`，间距收紧至 6px
+  - **字体层级**：`MetricRow` 指标名与百分比加粗，附加信息改用 `DPalette::TextTips`（自动跟主题）；百分比与信息间距加宽至 4px
+  - **折线图增强**：`Sparkline` 加圆角背景框 + 边框、Y 轴 0/100 标签、X 轴 -60s/现在 刻度、峰值圆点标记、暗色自适应网格/填充透明度
+  - **网络区重构**：`NetWidget` 从「↑ 值 ↓ 值」单行改为「上传 值 / 下载 值」两列等宽 + IP 单独一行，标签用 `TextTips` 色
+  - **番茄钟**：按钮缩小 52×24→44×22 / 48×24→40×22；番茄图标运行时呼吸脉动动画（`QPropertyAnimation` pulseScale 1.0↔1.12）
+  - **暗色文字修复**：`NetWidget` 标签和 IP 文字在主题切换时通过 `updateLabelColors()` 刷新 `TextTips` 色（之前构造时设固定色，切暗色后不更新）
+- **主题跟随深度修复（核心问题）**：
+  - **根因**：`DApplication` 默认不会自动跟随 DDE `GlobalTheme` 变化（非商店安装应用尤甚），之前仅靠 `themeTypeChanged` 被动响应，DTK 本身不主动切换
+  - **修复**：`main.cpp` 新增 `ThemeSyncHelper` + `appearanceIsDark()` + `syncThemeToAppearance()`：
+    - 启动时通过 DBus 读 `org.deepin.dde.Appearance1.GlobalTheme`/`GtkTheme`，调 `DGuiApplicationHelper::setPaletteType()` 同步一次
+    - 监听 `Changed` 信号（`ty` 参数是小写 `"globaltheme"`/`"gtk"`，需 `compare(CaseInsensitive)`），主题切换时实时更新 `paletteType`
+  - **验证**：浅色↔暗色切换实时生效；`MonitorWidget::applyThemeColors()` 已连 `themeTypeChanged`，联动更新指标色、分隔线色、网络标签色
+- **代码量**：约 2900 行（新增约 200 行，含主题同步、折线增强、网络重构、番茄动画）
+
+### 2026-08-10（同日三更）· 图标套件 + 启动脚本 + 隐藏按钮
+- **图标设计**：
+  - **主图标 `deskmon.svg`**：DDE 圆角方形底板（深蓝灰渐变）+ 仪表盘弧形（蓝色渐变进度环）+ 金色闪电（呼应标题栏标志）+ 底部四色点（CPU 蓝/内存 绿/GPU 粉/磁盘 黄）
+  - **托盘图标 `deskmon-tray.svg`**：极简单色版，蓝色弧线 + 金色闪电，适合 22×22 任务栏
+  - **Symbolic 图标 `deskmon-symbolic.svg`**：单色剪影版，`currentColor` 自动跟随主题前景色，暗色/通知场景
+  - **多尺寸 PNG**：用 `rsvg-convert` 生成主图标 8 尺寸（16~256）、托盘 4 尺寸、symbolic 4 尺寸
+  - **托盘图标加载**：三级降级 — 主题图标 → 本地 PNG 多尺寸 → 程序绘制回退
+- **快速启动脚本 `start.sh`**：
+  - `./start.sh` / `build` — 增量编译后启动（默认）
+  - `./start.sh run` — 跳过编译直接启动
+  - `./start.sh clean` — 清理 build 后全量编译并启动
+  - 自动设 `LD_LIBRARY_PATH`，启动前 `pkill` 旧实例避免单实例冲突
+- **标题栏隐藏按钮**：标题行新增 ✕ 按钮，点击隐藏窗口到托盘（托盘左键唤回），与 ◐ 透明度按钮并排
+- **代码量**：约 2950 行
+
 ### 待办（下一阶段）
-- [ ] deb 打包（`debian/` + 多尺寸 PNG 图标生成）
+- [ ] deb 打包（`debian/` + 多尺寸 PNG 图标安装规则）
 - [ ] 备赛材料：演示视频、截图、AI 对话记录存档
 - [ ] 论坛发帖提交

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DeskMon 托盘图标（单色符号版，适合 22x22 托盘区域）
+  设计：金色闪电 + 底部弧线（仪表盘），极简风格适配任务栏
+-->
+<svg width="22" height="22" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">
+  <!-- 底部弧线（仪表盘） -->
+  <path d="M 4 15 A 7 7 0 0 0 18 15"
+        fill="none" stroke="#0081ff" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 金色闪电 -->
+  <path d="M 12.5 3 L 8.5 11 L 11 11 L 9.5 16 L 14 9.5 L 11.5 9.5 L 12.5 3 Z"
+        fill="#e8b020" stroke="none"/>
+</svg>

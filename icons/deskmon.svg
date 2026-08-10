@@ -1,19 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-  <!-- 深色圆底 + 活跃色圆环 + 中心仪表盘箭头 -->
+  <!--
+    DeskMon 程序图标
+    设计语言：DDE 圆角方形底 + 仪表盘弧形 + 金色闪电（标题栏标志性元素）
+    含义：弧形代表监控/度量，闪电代表系统性能，四色点对应 CPU/内存/GPU/磁盘
+  -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2a2f3a"/>
-      <stop offset="1" stop-color="#14171d"/>
+    <!-- 底板渐变：深蓝灰 → 深靛蓝，暗色主题下也清晰 -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0.7" y2="1">
+      <stop offset="0" stop-color="#3a4a5e"/>
+      <stop offset="1" stop-color="#1a2332"/>
+    </linearGradient>
+    <!-- 内圈微光 -->
+    <radialGradient id="innerGlow" cx="0.5" cy="0.42" r="0.55">
+      <stop offset="0" stop-color="#4a5a72" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#1a2332" stop-opacity="0"/>
+    </radialGradient>
+    <!-- 弧形进度渐变 -->
+    <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0081ff"/>
+      <stop offset="1" stop-color="#00d4ff"/>
     </linearGradient>
   </defs>
-  <circle cx="128" cy="128" r="120" fill="url(#bg)"/>
-  <!-- 背景环槽 -->
-  <circle cx="128" cy="128" r="86" fill="none" stroke="#3a4050" stroke-width="18"/>
-  <!-- 活跃色进度环（约 75%） -->
-  <path d="M 128 42 A 86 86 0 1 1 58 172" fill="none" stroke="#0081ff" stroke-width="18"
-        stroke-linecap="round"/>
-  <!-- 中心圆点 -->
-  <circle cx="128" cy="128" r="38" fill="#1b1f27"/>
-  <circle cx="128" cy="128" r="12" fill="#00d4ff"/>
+
+  <!-- 圆角方形底板（DDE 风格） -->
+  <rect x="8" y="8" width="240" height="240" rx="56" ry="56" fill="url(#bg)"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" ry="56" fill="url(#innerGlow)"/>
+
+  <!-- 背景弧槽（灰色半圆环） -->
+  <path d="M 70 186 A 80 80 0 1 1 186 186"
+        fill="none" stroke="#2a3548" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- 活跃色弧形（约 70%，从顶部顺时针） -->
+  <path d="M 128 48 A 80 80 0 1 1 72 176"
+        fill="none" stroke="url(#arcGrad)" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- 金色闪电（标题栏标志性元素，居中偏上） -->
+  <path d="M 138 92 L 110 132 L 128 132 L 118 168 L 150 124 L 132 124 L 142 92 Z"
+        fill="#e8b020" stroke="#c89810" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- 四色指标点（底部，对应 CPU/内存/GPU/磁盘） -->
+  <circle cx="96"  cy="208" r="7" fill="#0081ff"/>
+  <circle cx="120" cy="208" r="7" fill="#00a870"/>
+  <circle cx="144" cy="208" r="7" fill="#ff6b9d"/>
+  <circle cx="168" cy="208" r="7" fill="#f0c040"/>
 </svg>

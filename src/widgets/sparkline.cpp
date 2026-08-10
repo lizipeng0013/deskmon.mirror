@@ -3,6 +3,10 @@
 
 #include "sparkline.h"
 
+#include <DPalette>
+#include <DPaletteHelper>
+#include <DGuiApplicationHelper>
+
 #include <QPainter>
 #include <QPainterPath>
 #include <QPaintEvent>
@@ -10,11 +14,12 @@
 #include <QFontMetrics>
 
 DWIDGET_USE_NAMESPACE
+DGUI_USE_NAMESPACE
 
 Sparkline::Sparkline(QWidget *parent)
     : DWidget(parent)
 {
-    setMinimumHeight(36);
+    setMinimumHeight(52);
 }
 
 void Sparkline::setSeriesCount(int count)
@@ -91,14 +96,62 @@ void Sparkline::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
+    const bool dark = DGuiApplicationHelper::instance()->themeType() == DGuiApplicationHelper::DarkType;
+    const DPalette pal = DPaletteHelper::instance()->palette(this);
+    const QColor textColor = pal.color(DPalette::TextTips);
+    const QColor frameColor = pal.color(DPalette::FrameBorder);
+
     const double w = width(), h = height();
-    const double topPad = 3, bottomPad = 3;
+    const double leftPad = 22;     // Y 轴标签
+    const double rightPad = 4;
+    const double topPad = 4;       // 顶部留一点给图例
+    const double bottomPad = 13;   // X 轴标签
+    const double plotW = qMax(10.0, w - leftPad - rightPad);
+    const double plotH = qMax(10.0, h - topPad - bottomPad);
+
+    // 背景框：轻微底色 + 圆角边框
+    const QRectF bgRect(0, 0, w, h);
+    QColor bgColor = frameColor;
+    bgColor.setAlpha(dark ? 30 : 18);
+    p.setPen(Qt::NoPen);
+    p.setBrush(bgColor);
+    p.drawRoundedRect(bgRect, 6, 6);
+    QColor borderColor = frameColor;
+    borderColor.setAlpha(dark ? 60 : 40);
+    p.setPen(QPen(borderColor, 1));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(bgRect.adjusted(0.5, 0.5, -0.5, -0.5), 6, 6);
 
     // 网格线：0% / 50% / 100%
-    p.setPen(QPen(QColor(255, 255, 255, 18), 1));
+    QColor gridColor = dark ? QColor(255, 255, 255, 25) : QColor(0, 0, 0, 18);
+    p.setPen(QPen(gridColor, 1));
     for (double frac : {0.0, 0.5, 1.0}) {
-        const double y = topPad + (h - topPad - bottomPad) * (1.0 - frac);
-        p.drawLine(QPointF(0, y), QPointF(w, y));
+        const double y = topPad + plotH * (1.0 - frac);
+        p.drawLine(QPointF(leftPad, y), QPointF(leftPad + plotW, y));
+    }
+
+    // Y 轴标签：100 / 0
+    {
+        QFont axisFont = font();
+        axisFont.setPointSizeF(axisFont.pointSizeF() - 3);
+        p.setFont(axisFont);
+        p.setPen(textColor);
+        const QFontMetrics fm(axisFont);
+        const int fh = fm.ascent();
+        p.drawText(QRectF(0, topPad - 3, leftPad - 3, fh), Qt::AlignRight | Qt::AlignTop, QStringLiteral("100"));
+        p.drawText(QRectF(0, topPad + plotH - fh + 3, leftPad - 3, fh), Qt::AlignRight | Qt::AlignBottom, QStringLiteral("0"));
+    }
+
+    // X 轴标签：-60s / 现在
+    {
+        QFont axisFont = font();
+        axisFont.setPointSizeF(axisFont.pointSizeF() - 3);
+        p.setFont(axisFont);
+        p.setPen(textColor);
+        const QFontMetrics fm(axisFont);
+        const int fh = fm.height();
+        p.drawText(QRectF(leftPad, h - bottomPad + 1, 30, fh), Qt::AlignLeft | Qt::AlignTop, QStringLiteral("-60s"));
+        p.drawText(QRectF(leftPad + plotW - 30, h - bottomPad + 1, 30, fh), Qt::AlignRight | Qt::AlignTop, QStringLiteral("现在"));
     }
 
     // 图例（右上角）：彩色圆点 + 标签
@@ -107,19 +160,19 @@ void Sparkline::paintEvent(QPaintEvent *)
         legendFont.setPointSizeF(legendFont.pointSizeF() - 3);
         p.setFont(legendFont);
         const QFontMetrics fm(legendFont);
-        double x = w - 2;
+        double x = leftPad + plotW - 2;
         for (int s = m_seriesCount - 1; s >= 0; --s) {
             if (s >= m_names.size() || m_names[s].isEmpty())
                 continue;
             const double textW = fm.horizontalAdvance(m_names[s]);
-            const double itemW = textW + 5;   // 圆点 + 间距
+            const double itemW = textW + 9;
             x -= itemW;
             p.setPen(Qt::NoPen);
             p.setBrush(m_colors[s].isValid() ? m_colors[s] : Qt::gray);
-            p.drawEllipse(QPointF(x + 1.5, 7), 2.5, 2.5);
+            p.drawEllipse(QPointF(x + 2, topPad + 6), 2.5, 2.5);
             p.setPen(m_colors[s].isValid() ? m_colors[s] : Qt::gray);
-            p.drawText(QPointF(x + 5, 9.5), m_names[s]);
-            x -= 6;
+            p.drawText(QPointF(x + 7, topPad + 9), m_names[s]);
+            x -= 2;
         }
     }
 
@@ -128,32 +181,37 @@ void Sparkline::paintEvent(QPaintEvent *)
             continue;
         const QVector<double> &buf = m_data[s];
 
-        // 只绘制已采集的样本（n 不足 60 时铺满整个宽度，形成“从左填充”效果）
         const int n = m_sampleCounts[s];
         if (n < 2)
             continue;
 
         QPainterPath path;
-        // 环形缓冲最新在尾部：样本 i 实际位于 buf[m_bufferSize - n + i]
         const int base = m_bufferSize - n;
+        double peakX = 0, peakY = 0;
+        double peakValue = -1;
         for (int i = 0; i < n; ++i) {
-            const double x = (n == 1) ? 0 : w * double(i) / double(n - 1);
-            const double y = topPad + (h - topPad - bottomPad) * (1.0 - buf[base + i] / 100.0);
+            const double x = leftPad + ((n == 1) ? 0 : plotW * double(i) / double(n - 1));
+            const double y = topPad + plotH * (1.0 - buf[base + i] / 100.0);
             if (i == 0)
                 path.moveTo(x, y);
             else
                 path.lineTo(x, y);
+            if (buf[base + i] > peakValue) {
+                peakValue = buf[base + i];
+                peakX = x;
+                peakY = y;
+            }
         }
 
-        // 主序列（第一条）加渐变填充，提升质感
+        // 主序列（第一条）加渐变填充
         if (s == 0) {
             QPainterPath fillPath = path;
-            fillPath.lineTo(w, h - bottomPad);
-            fillPath.lineTo(0, h - bottomPad);
+            fillPath.lineTo(leftPad + plotW, topPad + plotH);
+            fillPath.lineTo(leftPad, topPad + plotH);
             fillPath.closeSubpath();
-            QLinearGradient grad(0, topPad, 0, h - bottomPad);
+            QLinearGradient grad(0, topPad, 0, topPad + plotH);
             QColor base = m_colors[s];
-            base.setAlpha(70);
+            base.setAlpha(dark ? 90 : 70);
             grad.setColorAt(0, base);
             QColor transparent = m_colors[s];
             transparent.setAlpha(0);
@@ -161,17 +219,26 @@ void Sparkline::paintEvent(QPaintEvent *)
             p.fillPath(fillPath, grad);
         }
 
-        // 折线（1.5px）
+        // 折线
         QColor lineColor = m_colors[s];
-        lineColor.setAlpha(220);
+        lineColor.setAlpha(dark ? 235 : 220);
         p.setPen(QPen(lineColor, 1.5));
         p.drawPath(path);
 
         // 末端圆点
-        const double lastY = topPad + (h - topPad - bottomPad) * (1.0 - buf[m_bufferSize - 1] / 100.0);
+        const double lastY = topPad + plotH * (1.0 - buf[m_bufferSize - 1] / 100.0);
         p.setBrush(lineColor);
         p.setPen(Qt::NoPen);
-        p.drawEllipse(QPointF(w - 0.5, lastY), 2.2, 2.2);
+        p.drawEllipse(QPointF(leftPad + plotW - 0.5, lastY), 2.2, 2.2);
+
+        // 峰值标记
+        if (peakValue >= 0) {
+            QColor peakColor = m_colors[s];
+            peakColor.setAlpha(180);
+            p.setBrush(peakColor);
+            p.setPen(Qt::NoPen);
+            p.drawEllipse(QPointF(peakX, peakY), 2.5, 2.5);
+        }
     }
 }
 

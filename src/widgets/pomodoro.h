@@ -11,6 +11,7 @@
 #include <QElapsedTimer>
 
 class QTimer;
+class QPropertyAnimation;
 
 /**
  * @brief 番茄钟：25 分钟专注 / 5 分钟休息，自动轮换 + 完成通知
@@ -31,6 +32,8 @@ private slots:
 private:
     void setRemaining(int sec);
     void finishPhase();
+    void startPulse();
+    void stopPulse();
 
     enum State { Idle, RunningWork, Paused, RunningBreak };
 
@@ -43,6 +46,7 @@ private:
     QWidget *m_icon = nullptr;    // 自绘彩色番茄图标
     QLabel *m_time = nullptr;
     DTK_WIDGET_NAMESPACE::DPushButton *m_toggle = nullptr;
+    QPropertyAnimation *m_pulseAnim = nullptr;
 };
 
 #endif // DESKMON_POMODORO_H

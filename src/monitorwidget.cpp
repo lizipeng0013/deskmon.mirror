@@ -40,6 +40,7 @@
 #include <QFont>
 #include <QApplication>
 #include <QIcon>
+#include <QFile>
 
 DWIDGET_USE_NAMESPACE
 DCORE_USE_NAMESPACE
@@ -130,8 +131,8 @@ void MonitorWidget::setupUi()
     mainLayout->addWidget(container);
 
     auto *contentLayout = new QVBoxLayout(container);
-    contentLayout->setContentsMargins(14, 12, 14, 12);
-    contentLayout->setSpacing(9);
+    contentLayout->setContentsMargins(16, 14, 16, 12);
+    contentLayout->setSpacing(6);
 
     // 标题行：电力图标 + 应用名（随主题活跃色）
     auto *titleLayout = new QHBoxLayout;
@@ -157,12 +158,22 @@ void MonitorWidget::setupUi()
     connect(m_opacityBtn, &QToolButton::clicked, this, &MonitorWidget::cycleOpacity);
     titleLayout->addWidget(m_opacityBtn);
 
+    // 隐藏按钮：点击隐藏窗口到托盘（托盘左键可唤回）
+    auto *hideBtn = new QToolButton(container);
+    hideBtn->setText(QStringLiteral("✕"));
+    hideBtn->setToolTip(tr("隐藏到托盘（托盘左键点击唤回）"));
+    hideBtn->setCursor(Qt::PointingHandCursor);
+    hideBtn->setAutoRaise(true);
+    connect(hideBtn, &QToolButton::clicked, this, &QWidget::hide);
+    titleLayout->addWidget(hideBtn);
+
     contentLayout->addLayout(titleLayout);
 
-    auto *line = new QFrame(container);
-    line->setFrameShape(QFrame::HLine);
-    line->setFixedHeight(1);
-    contentLayout->addWidget(line);
+    // 分隔线：标题区 / 指标区
+    m_titleSep = new QFrame(container);
+    m_titleSep->setFrameShape(QFrame::HLine);
+    m_titleSep->setFixedHeight(1);
+    contentLayout->addWidget(m_titleSep);
 
     // 指标行（每项一行，独立配色，紧凑省高度；颜色由主题派生，见 applyThemeColors）
     m_cpuRow = new MetricRow(tr("CPU"), QColor(QStringLiteral("#0081ff")), container);
@@ -179,6 +190,12 @@ void MonitorWidget::setupUi()
     m_diskRow = new MetricRow(tr("系统盘"), QColor(QStringLiteral("#ffd93d")), container);
     contentLayout->addWidget(m_diskRow);
 
+    // 分隔线：指标区 / 趋势区
+    m_metricsSep = new QFrame(container);
+    m_metricsSep->setFrameShape(QFrame::HLine);
+    m_metricsSep->setFixedHeight(1);
+    contentLayout->addWidget(m_metricsSep);
+
     // CPU/GPU 趋势迷你折线（加分项）：窗口始终约 60 秒，缓冲随刷新间隔自适应
     m_sparkline = new Sparkline(container);
     m_sparkline->setSeriesCount(2);
@@ -190,6 +207,13 @@ void MonitorWidget::setupUi()
     // 网络
     m_netWidget = new NetWidget(container);
     contentLayout->addWidget(m_netWidget);
+
+    // 分隔线：网络区 / 工具区（番茄钟显示时才出现）
+    m_netSep = new QFrame(container);
+    m_netSep->setFrameShape(QFrame::HLine);
+    m_netSep->setFixedHeight(1);
+    m_netSep->setVisible(false);
+    contentLayout->addWidget(m_netSep);
 
     // 番茄钟（加分项，默认隐藏，托盘可切换）
     m_pomodoro = new Pomodoro(container);
@@ -207,15 +231,28 @@ void MonitorWidget::setupUi()
 
 void MonitorWidget::setupTray()
 {
-    // 图标：优先主题图标，回退程序绘制
+    // 图标：优先主题图标 → 本地 PNG → 程序绘制回退
     QIcon icon = QIcon::fromTheme(QStringLiteral("deskmon"));
     if (icon.isNull()) {
+        // 尝试从程序目录/icons 加载多尺寸 PNG
+        const QString iconDir = QApplication::applicationDirPath() + QStringLiteral("/../icons/hicolor");
+        for (int sz : {256, 128, 64, 48, 32, 22, 16}) {
+            const QString path = QStringLiteral("%1/%2x%2/apps/deskmon.png").arg(iconDir).arg(sz);
+            if (QFile::exists(path)) {
+                QPixmap pm(path);
+                if (!pm.isNull()) {
+                    icon.addFile(path, QSize(sz, sz));
+                }
+            }
+        }
+    }
+    if (icon.isNull()) {
+        // 最终回退：程序绘制简单图标
         QPixmap pm(64, 64);
         pm.fill(Qt::transparent);
         QPainter p(&pm);
         p.setRenderHint(QPainter::Antialiasing);
         p.setPen(Qt::NoPen);
-        // 使用活跃色（跟随主题）
         const QColor accent = DGuiApplicationHelper::instance()->applicationPalette().color(DPalette::Highlight);
         p.setBrush(accent);
         p.drawEllipse(8, 8, 48, 48);
@@ -277,6 +314,8 @@ void MonitorWidget::setupTray()
     connect(pomodoroAction, &QAction::toggled, this, [this](bool on) {
         if (m_pomodoro)
             m_pomodoro->setVisible(on);
+        if (m_netSep)
+            m_netSep->setVisible(on);
         if (on)
             positionWindow();
     });
@@ -340,6 +379,14 @@ void MonitorWidget::openSettings()
     dlg->deleteLater();
 }
 
+static void setSeparatorColor(QFrame *line, const QColor &color)
+{
+    if (!line)
+        return;
+    line->setStyleSheet(QStringLiteral("background-color: %1; border: none;").arg(color.name()));
+    line->setFrameShadow(QFrame::Plain);
+}
+
 void MonitorWidget::applyThemeColors()
 {
     const QVector<QColor> colors = ThemeColors::metricColors();
@@ -358,7 +405,14 @@ void MonitorWidget::applyThemeColors()
     if (m_netWidget) {
         const auto arrows = ThemeColors::netArrowColors();
         m_netWidget->setArrowColors(arrows.first, arrows.second);
+        m_netWidget->updateLabelColors();   // 标签/IP 提示色跟随主题
     }
+    // 分隔线颜色跟随主题边框色
+    const DPalette pal = DPaletteHelper::instance()->palette(this);
+    const QColor frameColor = pal.color(DPalette::FrameBorder);
+    setSeparatorColor(m_titleSep, frameColor);
+    setSeparatorColor(m_metricsSep, frameColor);
+    setSeparatorColor(m_netSep, frameColor);
 }
 
 void MonitorWidget::setOpacity(double v)
@@ -514,8 +568,11 @@ void MonitorWidget::togglePomodoro()
 {
     if (!m_pomodoro)
         return;
-    m_pomodoro->setVisible(!m_pomodoro->isVisible());
-    if (m_pomodoro->isVisible())
+    const bool on = !m_pomodoro->isVisible();
+    m_pomodoro->setVisible(on);
+    if (m_netSep)
+        m_netSep->setVisible(on);
+    if (on)
         positionWindow();
 }
 

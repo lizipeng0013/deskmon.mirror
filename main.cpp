@@ -4,10 +4,50 @@
 #include "monitorwidget.h"
 
 #include <DApplication>
+#include <DGuiApplicationHelper>
 
 #include <QGuiApplication>
+#include <QDBusInterface>
+#include <QDBusConnection>
 
 DWIDGET_USE_NAMESPACE
+DGUI_USE_NAMESPACE
+
+static bool appearanceIsDark()
+{
+    QDBusInterface iface(QStringLiteral("org.deepin.dde.Appearance1"),
+                         QStringLiteral("/org/deepin/dde/Appearance1"),
+                         QStringLiteral("org.deepin.dde.Appearance1"),
+                         QDBusConnection::sessionBus());
+    if (!iface.isValid())
+        return false;
+    const QString global = iface.property("GlobalTheme").toString();
+    const QString gtk = iface.property("GtkTheme").toString();
+    return global.contains(QStringLiteral("dark"), Qt::CaseInsensitive)
+           || gtk.contains(QStringLiteral("dark"), Qt::CaseInsensitive);
+}
+
+static void syncThemeToAppearance()
+{
+    auto *helper = DGuiApplicationHelper::instance();
+    if (!helper)
+        return;
+    const bool dark = appearanceIsDark();
+    helper->setPaletteType(dark ? DGuiApplicationHelper::DarkType : DGuiApplicationHelper::LightType);
+}
+
+class ThemeSyncHelper : public QObject
+{
+    Q_OBJECT
+public slots:
+    void onAppearanceChanged(const QString &ty, const QString &)
+    {
+        // DDE Changed 信号传的 ty 是小写（"globaltheme"/"gtk"），做大小写无关比较
+        if (ty.compare(QLatin1String("GlobalTheme"), Qt::CaseInsensitive) == 0
+            || ty.compare(QLatin1String("GtkTheme"), Qt::CaseInsensitive) == 0)
+            syncThemeToAppearance();
+    }
+};
 
 int main(int argc, char *argv[])
 {
@@ -34,9 +74,22 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    // DTK 默认不会自动跟随 DDE 的 GlobalTheme 变化（尤其非商店安装的应用），
+    // 这里通过 dbus 同步一次，并监听 Changed 信号实现切主题实时响应。
+    syncThemeToAppearance();
+    ThemeSyncHelper themeHelper;
+    QDBusConnection::sessionBus().connect(QStringLiteral("org.deepin.dde.Appearance1"),
+                                          QStringLiteral("/org/deepin/dde/Appearance1"),
+                                          QStringLiteral("org.deepin.dde.Appearance1"),
+                                          QStringLiteral("Changed"),
+                                          &themeHelper,
+                                          SLOT(onAppearanceChanged(QString, QString)));
+
     MonitorWidget w;
     QObject::connect(&app, &DApplication::newInstanceStarted, &w, &MonitorWidget::activateWindow);
     w.show();
 
     return app.exec();
 }
+
+#include "main.moc"
