@@ -1,7 +1,7 @@
 # 【deepin 插件开发活动】DeskMon —— DTK6 原生桌面系统监控
 
 > Deepin 社区「10 亿 Token 奖池，写出属于你的 deepin 桌面插件」活动参赛作品
-> 方向三：DTK 创新原生应用  ·  作者：kookboy  ·  许可证：GPL-3.0-or-later
+> 方向三：DTK 创新原生应用  ·  作者：kookboy  ·  许可证：GPL-2.0-or-later
 
 ## 一句话介绍
 
@@ -147,7 +147,7 @@ mkdir -p dist && cp ../deskmon_*.deb dist/
 
 仓库地址：[GitHub - kookboy/deskmon](https://github.com/kookboy/deskmon)（参赛期间以本地仓库为准，发帖后公开）
 
-许可证：**GPL-3.0-or-later**
+许可证：**GPL-2.0-or-later**
 
 ## 适用环境
 

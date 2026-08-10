@@ -79,4 +79,4 @@ dist/                         构建产物归档（.deb，不入库）
 
 ## 许可证
 
-GPL-3.0-or-later
+GPL-2.0-or-later

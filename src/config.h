@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 kookboy
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #ifndef DESKMON_CONFIG_H
 #define DESKMON_CONFIG_H
