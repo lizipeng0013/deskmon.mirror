@@ -50,7 +50,7 @@ MetricRow::MetricRow(const QString &title, const QColor &color, QWidget *parent)
     m_bar->setRange(0, 100);
     m_bar->setValue(0);
     m_bar->setTextVisible(false);
-    m_bar->setFixedHeight(6);
+    m_bar->setFixedHeight(7);
     m_bar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     auto *layout = new QVBoxLayout(this);

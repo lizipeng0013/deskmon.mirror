@@ -179,18 +179,51 @@ QPair<double, double> SystemMonitor::networkSpeed()
     return {qMax(0.0, up), qMax(0.0, down)};
 }
 
+namespace {
+// 常见虚拟/容器接口：默认路由缺失时跳过，避免 docker0/virbr 等占位 IP
+bool isVirtualIface(const QString &name)
+{
+    return name.startsWith(QLatin1String("docker")) || name.startsWith(QLatin1String("br-"))
+        || name.startsWith(QLatin1String("virbr")) || name.startsWith(QLatin1String("veth"))
+        || name.startsWith(QLatin1String("tun")) || name.startsWith(QLatin1String("tap"))
+        || name.startsWith(QLatin1String("vpn"));
+}
+} // namespace
+
 QStringList SystemMonitor::ipAddresses() const
 {
+    // 优先取默认路由所在接口（即真正上网的本机 IP）
+    QString defaultIface;
+    QFile routeFile(QStringLiteral("/proc/net/route"));
+    if (routeFile.open(QIODevice::ReadOnly)) {
+        const QStringList lines = QString::fromUtf8(routeFile.readAll()).split(QLatin1Char('\n'));
+        for (int i = 1; i < lines.size(); ++i) {   // 跳过表头
+            const QStringList parts = lines.at(i).trimmed().split(QLatin1Char('\t'));
+            if (parts.size() >= 3 && parts.at(1) == QLatin1String("00000000")) {
+                defaultIface = parts.at(0);
+                break;
+            }
+        }
+    }
+
     QStringList ips;
     const QList<QNetworkInterface> ifaces = QNetworkInterface::allInterfaces();
     for (const QNetworkInterface &iface : ifaces) {
         if (!(iface.flags() & QNetworkInterface::IsUp) || iface.flags() & QNetworkInterface::IsLoopBack)
             continue;
+        // 有默认路由：只取该接口；无默认路由：跳过虚拟接口兜底
+        if (!defaultIface.isEmpty() && iface.name() != defaultIface)
+            continue;
+        if (defaultIface.isEmpty() && isVirtualIface(iface.name()))
+            continue;
+
         for (const QNetworkAddressEntry &entry : iface.addressEntries()) {
             const QHostAddress addr = entry.ip();
             if (addr.protocol() == QAbstractSocket::IPv4Protocol)
                 ips << addr.toString();
         }
+        if (!defaultIface.isEmpty() && !ips.isEmpty())
+            break;
     }
     return ips;
 }

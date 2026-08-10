@@ -99,19 +99,19 @@ sudo apt install cmake qt6-base-dev qt6-tools-dev libdtk6core-dev libdtk6gui-dev
 - [x] GPU（有显卡时）：使用率 + 显存 + 温度（压力等级待补）
 - [x] 系统盘：磁盘进度
 - [x] 网络：上/下行速度 + IP
-- [x] 系统托盘：显示/隐藏、透明度、设置、退出（GPU/进程管理入口待补）
+- [x] 系统托盘：显示/隐藏、GPU 显存管理、进程管理、透明度、设置、退出
 - [x] 配置持久化：`~/.config/deskmon/config.json`
 - [x] 开机自启动
 
 > **无 NVIDIA 时的降级策略**：启动时探测 `nvidia-smi` 是否存在且可执行成功；不可用则隐藏 GPU 面板与「GPU 管理」托盘菜单项，主窗口自动收缩布局，配置中不写入 GPU 相关项。进程管理仍可用（走 `/proc`）。deb 中 `nvidia-smi` 放 `Recommends` 而非 `Depends`，避免无 N 卡用户无法安装。
 
 ### 4.2 加分项（冲刺一等奖）
-- [ ] 🍅 番茄钟面板：25/5 分钟倒计时 + 完成通知
-- [ ] 📈 CPU/GPU 迷你折线图：最近 60 秒趋势
+- [x] 🍅 番茄钟面板：25/5 分钟倒计时 + 完成通知（DNotifySender）
+- [x] 📈 CPU/GPU 迷你折线图：最近 60 秒趋势（`Sparkline`）
 - [x] 🎨 主题自动跟随：亮/暗/活跃色（DPalette）
-- [ ] 🎮 显存一键释放：`DTableWidget` + `DDialog`
+- [x] 🎮 显存一键释放：`DTableWidget` + `DDialog`
 - [x] ⚙️ 原生设置面板
-- [ ] 🔔 阈值告警：CPU/GPU > 90% 时 `DFloatingMessage`
+- [x] 🔔 阈值告警：CPU/GPU > 90% 时系统通知（原 DFloatingMessage 在无边框悬浮窗不渲染，改用 `DNotifySender`）
 
 ### 4.3 新增（原版没有，新版做）
 1. ~~圆形进度环~~ → 已改为**紧凑长条 + 百分比 + 独立配色**（`MetricRow`），更省高度
@@ -132,19 +132,19 @@ deskmon-dtk/
 ├── main.cpp                       # DApplication + setSingleInstance
 ├── src/
 │   ├── config.cpp/.h              # 配置读写 (~/.config/deskmon/)
-│   ├── systemmonitor.cpp/.h       # CPU/内存/磁盘/网络 数据层
-│   ├── nvidia_gpu.cpp/.h          # nvidia-smi 解析
-│   ├── processmgr.cpp/.h          # 进程查询（/proc）
-│   ├── widgets/
-│   │   ├── metricring.cpp/.h      # CPU/GPU 环形进度
-│   │   ├── metricbar.cpp/.h       # 内存/磁盘 条形进度
-│   │   ├── netwidget.cpp/.h       # 网络组件
-│   │   ├── timerwidget.cpp/.h     # 番茄钟（加分项）
-│   │   └── sparkline.cpp/.h       # 迷你折线（加分项）
-│   ├── monitorwidget.cpp/.h       # 主悬浮窗口
-│   ├── gpu_dialog.cpp/.h          # 显存管理
-│   ├── process_dialog.cpp/.h      # 进程管理
-│   └── settings_dialog.cpp/.h     # 设置
+│   ├── systemmonitor.cpp/.h       # CPU/内存/磁盘/网络/GPU 数据层（/proc+sysfs）
+│   ├── nvidia_gpu.cpp/.h          # nvidia-smi 封装 + 降级探测
+│   ├── processmgr.cpp/.h          # 进程查询（/proc）+ 终止
+│   ├── themecolors.cpp/.h         # 主题跟随的指标配色
+│   ├── settings_dialog.cpp/.h     # 原生设置面板（DDialog）
+│   ├── process_dialog.cpp/.h      # 进程管理对话框
+│   ├── gpu_dialog.cpp/.h          # GPU 显存管理对话框
+│   ├── monitorwidget.cpp/.h       # 主悬浮窗口 + 托盘 + 阈值告警
+│   └── widgets/
+│       ├── metricrow.cpp/.h       # 紧凑指标行（点+名称+百分比+细条）
+│       ├── netwidget.cpp/.h       # 网络组件（速度+本机 IP）
+│       ├── sparkline.cpp/.h       # CPU/GPU 迷你折线（加分项）
+│       └── pomodoro.cpp/.h        # 番茄钟（加分项）
 ├── icons/
 │   └── deskmon.svg                # 矢量图标源
 ├── deskmon.desktop                # 启动器
@@ -313,12 +313,41 @@ install(FILES icons/deskmon.svg
 - [x] 实现 `MetricRow` / `NetWidget` 控件（原 `MetricRing`/`MetricBar` 已由 `MetricRow` 取代）
 - [x] 实现主悬浮窗口 `MonitorWidget`（拖动/改宽/磨砂圆角/单实例）
 - [x] 实现系统托盘（显示隐藏/透明度/设置/退出）
-- [ ] 实现 GPU / 进程管理对话框
+- [x] 实现 GPU / 进程管理对话框（`ProcessMgr` / `ProcessDialog` / `GpuDialog`，含一键释放与结束进程）
 - [x] 实现设置面板 + 配置持久化 + 开机自启动 + 透明度可调
-- [ ] 实现番茄钟（加分项）
-- [ ] 实现迷你折线图（加分项）
+- [x] 实现番茄钟（加分项，托盘可切换显隐）
+- [x] 实现迷你折线图（加分项，CPU/GPU 60s 趋势）
 - [x] 实现主题自动跟随（加分项）
+- [x] 实现阈值告警（加分项，边沿触发 + 系统通知）
 - [x] 设计矢量图标（`icons/deskmon.svg`；多尺寸 PNG 待 deb 打包时生成）
 - [ ] deb 打包
 - [ ] 录演示视频、截图
+- [ ] 论坛发帖提交
+
+---
+
+## 十、开发进度日志
+
+### 2026-08-10（首日开工）· 里程碑：MVP 跑通 + 全部加分项
+- **工程骨架**：CMake + main.cpp + 数据层（SystemMonitor/NvidiaGpu/Config）+ 控件（MetricRow/NetWidget）+ 主悬浮窗（拖动/改宽/磨砂圆角/单实例）+ 托盘 + 配置持久化 + 开机自启
+- **环境修复**：jm-prefix 工具链 5 个断链重定向、补齐 `DObject`/`DThemeManager` 转发头
+- **关键 bug 定位**：`DLogManager::registerConsoleAppender()` 会破坏事件循环（QTimer 不再触发），二分定位后弃用，改用 Qt 原生日志
+- **选型修正**：环形控件太占高度 → 紧凑长条 `MetricRow`；`DMainWindow` → `DWidget` + `DBlurEffectWidget`
+- **功能扩展**：
+  - 透明度可调（托盘子菜单 + 设置滑条）
+  - 主题跟随（指标色由系统活跃色派生，`themeTypeChanged` 实时更新）
+  - 原生设置面板（透明度/刷新间隔/显隐/置顶/自启）
+  - 进程管理对话框（/proc 数据 + 排序 + 结束进程 + DDialog 确认）
+  - GPU 显存管理对话框（显存进程表 + 一键释放）
+  - 迷你折线图（CPU/GPU 60s 趋势）
+  - 番茄钟（25/5 自动轮换 + 系统通知）
+  - 阈值告警（CPU/GPU > 90% 边沿触发 + 系统通知；原 DFloatingMessage 在无边框悬浮窗不渲染，改用 DNotifySender）
+  - 网络区域只显示本机 IP（默认路由接口，过滤 docker 桥接）
+  - **主题跟随修复**：`DBlurEffectWidget` 遮罩改 `AutoColor`（之前固定深色遮罩，在亮色主题系统上不跟随）；标题圆点/折线颜色随活跃色实时更新
+  - **UI 美化**：标题区精简（活跃色圆点+加粗应用名）、折线渐变填充、进度条加粗、间距优化
+- **代码量**：约 2700 行（27 个源文件，含 CMakeLists）
+
+### 待办（下一阶段）
+- [ ] deb 打包（`debian/` + 多尺寸 PNG 图标生成）
+- [ ] 备赛材料：演示视频、截图、AI 对话记录存档
 - [ ] 论坛发帖提交

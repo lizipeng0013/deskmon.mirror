@@ -24,10 +24,15 @@ add_executable(deskmon
     src/config.cpp
     src/systemmonitor.cpp
     src/nvidia_gpu.cpp
+    src/processmgr.cpp
     src/themecolors.cpp
     src/settings_dialog.cpp
+    src/process_dialog.cpp
+    src/gpu_dialog.cpp
     src/widgets/metricrow.cpp
     src/widgets/netwidget.cpp
+    src/widgets/sparkline.cpp
+    src/widgets/pomodoro.cpp
     src/monitorwidget.cpp
 )
 

@@ -18,7 +18,7 @@ public:
     void load();
     void save();
 
-    QVariant get(const QString &key) const;
+    QVariant get(const QString &key, const QVariant &defaultValue = QVariant()) const;
     void set(const QString &key, const QVariant &value);
 
     // 便捷访问

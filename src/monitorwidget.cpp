@@ -7,8 +7,14 @@
 #include "systemmonitor.h"
 #include "themecolors.h"
 #include "settings_dialog.h"
+#include "process_dialog.h"
+#include "gpu_dialog.h"
 #include "widgets/metricrow.h"
 #include "widgets/netwidget.h"
+#include "widgets/sparkline.h"
+#include "widgets/pomodoro.h"
+
+#include <DNotifySender>
 
 #include <DApplication>
 #include <DGuiApplicationHelper>
@@ -34,6 +40,7 @@
 #include <QIcon>
 
 DWIDGET_USE_NAMESPACE
+DCORE_USE_NAMESPACE
 
 MonitorWidget::~MonitorWidget() = default;
 
@@ -80,20 +87,29 @@ void MonitorWidget::setupUi()
     container->setRadius(10);
     container->setBlurRectXRadius(10);
     container->setBlurRectYRadius(10);
-    container->setMaskAlpha(150);
+    // 遮罩色跟随系统明/暗主题（之前固定深色导致亮色主题下不跟随）
+    container->setMaskColor(DBlurEffectWidget::AutoColor);
+    container->setMaskAlpha(170);
     container->setBlendMode(DBlurEffectWidget::BehindWindowBlend);
     mainLayout->addWidget(container);
 
     auto *contentLayout = new QVBoxLayout(container);
-    contentLayout->setContentsMargins(12, 10, 12, 10);
-    contentLayout->setSpacing(8);
+    contentLayout->setContentsMargins(14, 12, 14, 12);
+    contentLayout->setSpacing(9);
 
-    // 标题行
+    // 标题行：活跃色圆点 + 应用名（随主题）
     auto *titleLayout = new QHBoxLayout;
-    auto *titleLabel = new QLabel(tr("⚡ 系统监控"), container);
+    titleLayout->setSpacing(6);
+    m_titleDot = new QLabel(QStringLiteral("●"), container);
+    m_titleDot->setStyleSheet(QStringLiteral("color: %1; font-size: 9px;")
+                                  .arg(DGuiApplicationHelper::instance()
+                                           ->applicationPalette().color(DPalette::Highlight).name()));
+    auto *titleLabel = new QLabel(tr("系统监控"), container);
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
+    titleFont.setPointSizeF(titleFont.pointSizeF() + 1);
     titleLabel->setFont(titleFont);
+    titleLayout->addWidget(m_titleDot);
     titleLayout->addWidget(titleLabel);
     titleLayout->addStretch();
     contentLayout->addLayout(titleLayout);
@@ -118,9 +134,19 @@ void MonitorWidget::setupUi()
     m_diskRow = new MetricRow(tr("系统盘"), QColor(QStringLiteral("#ffd93d")), container);
     contentLayout->addWidget(m_diskRow);
 
+    // CPU/GPU 60 秒趋势迷你折线（加分项）
+    m_sparkline = new Sparkline(container);
+    m_sparkline->setSeriesCount(2);
+    contentLayout->addWidget(m_sparkline);
+
     // 网络
     m_netWidget = new NetWidget(container);
     contentLayout->addWidget(m_netWidget);
+
+    // 番茄钟（加分项，默认隐藏，托盘可切换）
+    m_pomodoro = new Pomodoro(container);
+    m_pomodoro->setVisible(false);
+    contentLayout->addWidget(m_pomodoro);
 
     // 底部右侧留出宽度调整热区（右下角 16px）
     auto *resizeHint = new QLabel(tr("⟋"), container);
@@ -177,6 +203,35 @@ void MonitorWidget::setupTray()
             setOpacity(pct / 100.0);
         });
     }
+
+    // GPU 显存管理（无 N 卡时隐藏）
+    if (m_gpuAvailable) {
+        QAction *gpuAction = menu->addAction(tr("GPU 显存管理"));
+        connect(gpuAction, &QAction::triggered, this, [this] {
+            auto *dlg = new GpuDialog(m_monitor.get(), this);
+            dlg->exec();
+            dlg->deleteLater();
+        });
+    }
+
+    // 进程管理
+    QAction *processAction = menu->addAction(tr("进程管理"));
+    connect(processAction, &QAction::triggered, this, [this] {
+        auto *dlg = new ProcessDialog(this);
+        dlg->exec();
+        dlg->deleteLater();
+    });
+
+    // 番茄钟（加分项）
+    QAction *pomodoroAction = menu->addAction(tr("🍅 番茄钟"));
+    pomodoroAction->setCheckable(true);
+    pomodoroAction->setChecked(m_pomodoro->isVisible());
+    connect(pomodoroAction, &QAction::toggled, this, [this](bool on) {
+        if (m_pomodoro)
+            m_pomodoro->setVisible(on);
+        if (on)
+            positionWindow();
+    });
 
     // 设置面板
     QAction *settingsAction = menu->addAction(tr("设置"));
@@ -243,6 +298,15 @@ void MonitorWidget::applyThemeColors()
     if (m_gpuRow)
         m_gpuRow->setColor(colors.value(2));
     m_diskRow->setColor(colors.value(3));
+    // 折线颜色与标题圆点同步活跃色
+    if (m_sparkline) {
+        m_sparkline->setColor(0, colors.value(0));
+        m_sparkline->setColor(1, colors.value(2));
+    }
+    if (m_titleDot) {
+        m_titleDot->setStyleSheet(QStringLiteral("color: %1; font-size: 9px;")
+                                      .arg(colors.value(0).name()));
+    }
 }
 
 void MonitorWidget::setOpacity(double v)
@@ -282,8 +346,10 @@ void MonitorWidget::savePosition()
 
 void MonitorWidget::refresh()
 {
+    double cpu = -1, gpu = -1;
+
     // CPU
-    const double cpu = m_monitor->cpuUsage();
+    cpu = m_monitor->cpuUsage();
     if (cpu >= 0) {
         m_cpuRow->setValue(int(cpu + 0.5));
         m_cpuRow->setInfo(tr("温度 %1℃").arg(int(m_monitor->cpuTemp())));
@@ -301,12 +367,13 @@ void MonitorWidget::refresh()
 
     // GPU
     if (m_gpuRow) {
-        const auto gpu = m_monitor->gpuStats();
-        if (gpu.util >= 0) {
-            m_gpuRow->setValue(int(gpu.util + 0.5));
-            m_gpuRow->setInfo(QStringLiteral("%1℃·%2/%3G").arg(int(gpu.temp))
-                                                .arg(gpu.memUsedMB / 1024.0, 0, 'f', 1)
-                                                .arg(gpu.memTotalMB / 1024.0, 0, 'f', 1));
+        const auto gpuStats = m_monitor->gpuStats();
+        gpu = gpuStats.util;
+        if (gpu >= 0) {
+            m_gpuRow->setValue(int(gpu + 0.5));
+            m_gpuRow->setInfo(QStringLiteral("%1℃·%2/%3G").arg(int(gpuStats.temp))
+                                                .arg(gpuStats.memUsedMB / 1024.0, 0, 'f', 1)
+                                                .arg(gpuStats.memTotalMB / 1024.0, 0, 'f', 1));
         }
     }
 
@@ -323,6 +390,60 @@ void MonitorWidget::refresh()
     const auto speed = m_monitor->networkSpeed();
     m_netWidget->setSpeed(speed.first, speed.second);
     m_netWidget->setIps(m_monitor->ipAddresses());
+
+    // 折线趋势 + 阈值告警
+    if (m_sparkline) {
+        if (cpu >= 0) m_sparkline->setValue(0, cpu);
+        if (gpu >= 0) m_sparkline->setValue(1, gpu);
+    }
+    checkAlerts(cpu, gpu);
+}
+
+void MonitorWidget::checkAlerts(double cpu, double gpu)
+{
+    // 阈值：默认 90，可从配置覆盖
+    const double cpuTh = m_config->get(QStringLiteral("cpu_alert_threshold"), 90).toDouble();
+    const double gpuTh = m_config->get(QStringLiteral("gpu_alert_threshold"), 90).toDouble();
+
+    // CPU 告警（边沿触发：仅从低于阈值跃升到超过时提醒一次）
+    if (cpu >= 0) {
+        if (cpu > cpuTh && !m_cpuAlerted) {
+            m_cpuAlerted = true;
+            notifyAlert(tr("CPU 使用率 %1% 超过阈值 %2%").arg(int(cpu)).arg(int(cpuTh)));
+        } else if (cpu <= cpuTh) {
+            m_cpuAlerted = false;
+        }
+    }
+
+    // GPU 告警
+    if (gpu >= 0) {
+        if (gpu > gpuTh && !m_gpuAlerted) {
+            m_gpuAlerted = true;
+            notifyAlert(tr("GPU 使用率 %1% 超过阈值 %2%").arg(int(gpu)).arg(int(gpuTh)));
+        } else if (gpu <= gpuTh) {
+            m_gpuAlerted = false;
+        }
+    }
+}
+
+void MonitorWidget::notifyAlert(const QString &message)
+{
+    // 系统通知（DNotifySender）对无边框悬浮窗可靠，且窗口隐藏时也能提醒
+    DUtil::DNotifySender(tr("DeskMon 告警"))
+        .appName(QStringLiteral("DeskMon"))
+        .appIcon(QStringLiteral("deskmon"))
+        .appBody(message)
+        .timeOut(3000)
+        .call();
+}
+
+void MonitorWidget::togglePomodoro()
+{
+    if (!m_pomodoro)
+        return;
+    m_pomodoro->setVisible(!m_pomodoro->isVisible());
+    if (m_pomodoro->isVisible())
+        positionWindow();
 }
 
 void MonitorWidget::activateWindow()

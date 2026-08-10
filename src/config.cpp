@@ -84,9 +84,9 @@ void Config::save()
     file.write(QJsonDocument(obj).toJson(QJsonDocument::Indented));
 }
 
-QVariant Config::get(const QString &key) const
+QVariant Config::get(const QString &key, const QVariant &defaultValue) const
 {
-    return m_data.value(key);
+    return m_data.value(key, defaultValue);
 }
 
 void Config::set(const QString &key, const QVariant &value)

@@ -15,6 +15,8 @@ class SystemMonitor;
 class Config;
 class MetricRow;
 class NetWidget;
+class Sparkline;
+class Pomodoro;
 
 /**
  * @brief 主悬浮监控窗口
@@ -55,6 +57,9 @@ private:
     void updateRowsVisibility();  // 按 show_gpu/show_disk 显示/隐藏指标行
     void applyStayOnTop();        // 按配置应用窗口置顶
     void openSettings();          // 打开设置面板并应用更改
+    void togglePomodoro();        // 托盘切换番茄钟行显隐
+    void checkAlerts(double cpu, double gpu);  // 阈值告警（边沿触发）
+    void notifyAlert(const QString &message);  // 系统通知发告警
 
     std::unique_ptr<Config> m_config;
     std::unique_ptr<SystemMonitor> m_monitor;
@@ -74,8 +79,13 @@ private:
     MetricRow *m_gpuRow = nullptr;
     MetricRow *m_diskRow = nullptr;
     NetWidget *m_netWidget = nullptr;
+    Sparkline *m_sparkline = nullptr;   // CPU/GPU 60s 趋势（加分项）
+    Pomodoro *m_pomodoro = nullptr;     // 番茄钟（加分项，默认隐藏）
+    QLabel *m_titleDot = nullptr;       // 标题活跃色圆点
 
     bool m_gpuAvailable = false;
+    bool m_cpuAlerted = false;          // 告警边沿状态
+    bool m_gpuAlerted = false;
 };
 
 #endif // DESKMON_MONITORWIDGET_H
