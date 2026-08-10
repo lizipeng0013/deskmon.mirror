@@ -13,3 +13,9 @@ export PATH := $(HOME)/jm-prefix/usr/bin:$(PATH)
 
 override_dh_auto_configure:
 	dh_auto_configure -- -DCMAKE_PREFIX_PATH="$(HOME)/jm-prefix/usr"
+
+# 参赛发布版只分发主包，不产出独立 dbgsym 调试符号包：
+# 跳过 dh_dwz（DWARF 压缩），dh_strip 禁止自动拆分调试信息到 .debug。
+override_dh_dwz:
+override_dh_strip:
+	dh_strip --no-automatic-dbgsym
