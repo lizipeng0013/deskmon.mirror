@@ -6,6 +6,7 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QStringList>
+#include <QColor>
 
 DWIDGET_USE_NAMESPACE
 
@@ -50,6 +51,13 @@ void NetWidget::setSpeed(double uploadBps, double downloadBps)
 {
     m_up->setText(QStringLiteral("↑ %1").arg(formatSpeed(uploadBps)));
     m_down->setText(QStringLiteral("↓ %1").arg(formatSpeed(downloadBps)));
+}
+
+void NetWidget::setArrowColors(const QColor &up, const QColor &down)
+{
+    // 箭头着色：上传橙、下载绿（颜色为装饰强调，随主题更新）
+    m_up->setStyleSheet(QStringLiteral("color: %1;").arg(up.name()));
+    m_down->setStyleSheet(QStringLiteral("color: %1;").arg(down.name()));
 }
 
 void NetWidget::setIps(const QStringList &ips)

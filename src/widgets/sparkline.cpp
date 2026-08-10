@@ -7,6 +7,7 @@
 #include <QPainterPath>
 #include <QPaintEvent>
 #include <QLinearGradient>
+#include <QFontMetrics>
 
 DWIDGET_USE_NAMESPACE
 
@@ -23,6 +24,8 @@ void Sparkline::setSeriesCount(int count)
     m_sampleCounts = QVector<int>(m_seriesCount, 0);
     if (m_colors.size() < m_seriesCount)
         m_colors.resize(m_seriesCount);
+    if (m_names.size() < m_seriesCount)
+        m_names.resize(m_seriesCount);
     update();
 }
 
@@ -31,6 +34,14 @@ void Sparkline::setColor(int series, const QColor &color)
     if (series < 0 || series >= m_seriesCount)
         return;
     m_colors[series] = color;
+    update();
+}
+
+void Sparkline::setSeriesName(int series, const QString &name)
+{
+    if (series < 0 || series >= m_seriesCount)
+        return;
+    m_names[series] = name;
     update();
 }
 
@@ -55,6 +66,26 @@ void Sparkline::clear()
     update();
 }
 
+void Sparkline::setBufferSize(int size)
+{
+    size = qMax(10, size);
+    if (size == m_bufferSize)
+        return;
+    // 调整缓冲，保留尾部最新样本
+    for (int s = 0; s < m_seriesCount; ++s) {
+        QVector<double> nb(size, 0.0);
+        const int keep = qMin(size, m_bufferSize);
+        const int srcStart = m_bufferSize - keep;
+        const int dstStart = size - keep;
+        for (int i = 0; i < keep; ++i)
+            nb[dstStart + i] = m_data[s][srcStart + i];
+        m_data[s] = nb;
+        m_sampleCounts[s] = qMin(m_sampleCounts[s], size);
+    }
+    m_bufferSize = size;
+    update();
+}
+
 void Sparkline::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
@@ -68,6 +99,28 @@ void Sparkline::paintEvent(QPaintEvent *)
     for (double frac : {0.0, 0.5, 1.0}) {
         const double y = topPad + (h - topPad - bottomPad) * (1.0 - frac);
         p.drawLine(QPointF(0, y), QPointF(w, y));
+    }
+
+    // 图例（右上角）：彩色圆点 + 标签
+    {
+        QFont legendFont = font();
+        legendFont.setPointSizeF(legendFont.pointSizeF() - 3);
+        p.setFont(legendFont);
+        const QFontMetrics fm(legendFont);
+        double x = w - 2;
+        for (int s = m_seriesCount - 1; s >= 0; --s) {
+            if (s >= m_names.size() || m_names[s].isEmpty())
+                continue;
+            const double textW = fm.horizontalAdvance(m_names[s]);
+            const double itemW = textW + 5;   // 圆点 + 间距
+            x -= itemW;
+            p.setPen(Qt::NoPen);
+            p.setBrush(m_colors[s].isValid() ? m_colors[s] : Qt::gray);
+            p.drawEllipse(QPointF(x + 1.5, 7), 2.5, 2.5);
+            p.setPen(m_colors[s].isValid() ? m_colors[s] : Qt::gray);
+            p.drawText(QPointF(x + 5, 9.5), m_names[s]);
+            x -= 6;
+        }
     }
 
     for (int s = 0; s < m_seriesCount; ++s) {

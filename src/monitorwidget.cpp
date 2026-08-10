@@ -30,17 +30,53 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPixmap>
+#include <QPolygonF>
 #include <QScreen>
 #include <QGuiApplication>
 #include <QSystemTrayIcon>
 #include <QMenu>
 #include <QActionGroup>
+#include <QToolButton>
 #include <QFont>
 #include <QApplication>
 #include <QIcon>
 
 DWIDGET_USE_NAMESPACE
 DCORE_USE_NAMESPACE
+
+// 电力（闪电）图标：颜色由外部设置，跟随主题活跃色
+// （全局类，配合 monitorwidget.h 的前向声明）
+class PowerIcon : public QWidget
+{
+public:
+    explicit PowerIcon(QWidget *parent = nullptr)
+        : QWidget(parent)
+    {
+        setFixedSize(18, 18);
+    }
+
+    void setColor(const QColor &color)
+    {
+        m_color = color;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setPen(Qt::NoPen);
+        p.setBrush(m_color);
+        QPolygonF bolt;
+        bolt << QPointF(11, 1) << QPointF(4, 11) << QPointF(8, 11)
+             << QPointF(7, 17) << QPointF(14, 8) << QPointF(10, 8) << QPointF(11, 1);
+        p.drawPolygon(bolt);
+    }
+
+private:
+    QColor m_color = Qt::gray;
+};
 
 MonitorWidget::~MonitorWidget() = default;
 
@@ -97,21 +133,30 @@ void MonitorWidget::setupUi()
     contentLayout->setContentsMargins(14, 12, 14, 12);
     contentLayout->setSpacing(9);
 
-    // 标题行：活跃色圆点 + 应用名（随主题）
+    // 标题行：电力图标 + 应用名（随主题活跃色）
     auto *titleLayout = new QHBoxLayout;
     titleLayout->setSpacing(6);
-    m_titleDot = new QLabel(QStringLiteral("●"), container);
-    m_titleDot->setStyleSheet(QStringLiteral("color: %1; font-size: 9px;")
-                                  .arg(DGuiApplicationHelper::instance()
-                                           ->applicationPalette().color(DPalette::Highlight).name()));
+    m_titleIcon = new PowerIcon(container);
+    m_titleIcon->setColor(QColor(QStringLiteral("#e8b020")));  // 金黄色
     auto *titleLabel = new QLabel(tr("系统监控"), container);
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSizeF(titleFont.pointSizeF() + 1);
     titleLabel->setFont(titleFont);
-    titleLayout->addWidget(m_titleDot);
+    titleLayout->addWidget(m_titleIcon);
     titleLayout->addWidget(titleLabel);
     titleLayout->addStretch();
+
+    // 对比度（透明度）快捷切换：点击循环
+    m_opacityBtn = new QToolButton(container);
+    m_opacityBtn->setText(QStringLiteral("◐"));
+    m_opacityBtn->setToolTip(tr("点击切换透明度（当前 %1%）")
+                                 .arg(qRound(m_config->opacity() * 100)));
+    m_opacityBtn->setCursor(Qt::PointingHandCursor);
+    m_opacityBtn->setAutoRaise(true);
+    connect(m_opacityBtn, &QToolButton::clicked, this, &MonitorWidget::cycleOpacity);
+    titleLayout->addWidget(m_opacityBtn);
+
     contentLayout->addLayout(titleLayout);
 
     auto *line = new QFrame(container);
@@ -134,9 +179,12 @@ void MonitorWidget::setupUi()
     m_diskRow = new MetricRow(tr("系统盘"), QColor(QStringLiteral("#ffd93d")), container);
     contentLayout->addWidget(m_diskRow);
 
-    // CPU/GPU 60 秒趋势迷你折线（加分项）
+    // CPU/GPU 趋势迷你折线（加分项）：窗口始终约 60 秒，缓冲随刷新间隔自适应
     m_sparkline = new Sparkline(container);
     m_sparkline->setSeriesCount(2);
+    m_sparkline->setBufferSize(qMax(12, 60000 / qMax(1, m_config->refreshInterval())));
+    m_sparkline->setSeriesName(0, tr("CPU"));
+    m_sparkline->setSeriesName(1, tr("GPU"));
     contentLayout->addWidget(m_sparkline);
 
     // 网络
@@ -282,9 +330,11 @@ void MonitorWidget::openSettings()
     auto *dlg = new SettingsDialog(m_config.get(), m_gpuAvailable, this);
     connect(dlg, &SettingsDialog::settingsApplied, this, [this] {
         applyConfig();
-        // 刷新间隔可能被修改，重启定时器
+        // 刷新间隔可能被修改，重启定时器；折线缓冲同步，保持约 60 秒窗口
         m_timer->setInterval(m_config->refreshInterval());
         m_timer->start();
+        if (m_sparkline)
+            m_sparkline->setBufferSize(qMax(12, 60000 / qMax(1, m_config->refreshInterval())));
     });
     dlg->exec();
     dlg->deleteLater();
@@ -303,9 +353,11 @@ void MonitorWidget::applyThemeColors()
         m_sparkline->setColor(0, colors.value(0));
         m_sparkline->setColor(1, colors.value(2));
     }
-    if (m_titleDot) {
-        m_titleDot->setStyleSheet(QStringLiteral("color: %1; font-size: 9px;")
-                                      .arg(colors.value(0).name()));
+    // 标题电力图标固定金黄色（不随主题色），无需在此更新
+    // 网络箭头：上传橙、下载绿
+    if (m_netWidget) {
+        const auto arrows = ThemeColors::netArrowColors();
+        m_netWidget->setArrowColors(arrows.first, arrows.second);
     }
 }
 
@@ -314,6 +366,27 @@ void MonitorWidget::setOpacity(double v)
     const double clamped = qBound(0.3, v, 1.0);
     setWindowOpacity(clamped);
     m_config->set(QStringLiteral("opacity"), clamped);
+    if (m_opacityBtn) {
+        m_opacityBtn->setToolTip(tr("点击切换透明度（当前 %1%）")
+                                     .arg(qRound(clamped * 100)));
+    }
+}
+
+void MonitorWidget::cycleOpacity()
+{
+    // 透明度档位：100% → 85% → 70% → 55% → 40% → 循环
+    static const QVector<double> presets = {1.0, 0.85, 0.70, 0.55, 0.40};
+    const double cur = m_config->opacity();
+    int idx = 0;
+    double best = 999.0;
+    for (int i = 0; i < presets.size(); ++i) {
+        const double d = qAbs(presets.at(i) - cur);
+        if (d < best) {
+            best = d;
+            idx = i;
+        }
+    }
+    setOpacity(presets.at((idx + 1) % presets.size()));
 }
 
 void MonitorWidget::positionWindow()

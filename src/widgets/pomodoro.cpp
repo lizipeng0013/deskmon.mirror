@@ -9,14 +9,57 @@
 #include <QFont>
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPaintEvent>
 
 DWIDGET_USE_NAMESPACE
 DCORE_USE_NAMESPACE
 
+namespace {
+// 彩色番茄图标：红果体 + 绿叶 + 高光（不依赖系统 emoji 字体）
+class TomatoIcon : public QWidget
+{
+public:
+    explicit TomatoIcon(QWidget *parent = nullptr)
+        : QWidget(parent)
+    {
+        setFixedSize(18, 18);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+
+        // 叶与茎
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(QStringLiteral("#2e9e5b")));
+        QPainterPath leaf;
+        leaf.moveTo(9, 4);
+        leaf.cubicTo(3, 1, 4, 7, 9, 5);      // 左叶
+        p.drawPath(leaf);
+        QPainterPath leaf2;
+        leaf2.moveTo(9, 4);
+        leaf2.cubicTo(14, 1, 14, 7, 9, 5);    // 右叶
+        p.drawPath(leaf2);
+
+        // 果体
+        p.setBrush(QColor(QStringLiteral("#e04141")));
+        p.drawEllipse(2, 5, 14, 12);
+
+        // 高光
+        p.setBrush(QColor(255, 255, 255, 70));
+        p.drawEllipse(5, 8, 4, 3);
+    }
+};
+} // namespace
+
 Pomodoro::Pomodoro(QWidget *parent)
     : DWidget(parent)
 {
-    m_icon = new QLabel(QStringLiteral("🍅"), this);
+    m_icon = new TomatoIcon(this);
 
     m_time = new QLabel(this);
     QFont timeFont = m_time->font();

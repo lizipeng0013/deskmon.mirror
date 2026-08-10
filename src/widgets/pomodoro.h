@@ -40,7 +40,7 @@ private:
     static constexpr int kBreakSec = 5 * 60;
 
     QTimer *m_timer = nullptr;
-    QLabel *m_icon = nullptr;
+    QWidget *m_icon = nullptr;    // 自绘彩色番茄图标
     QLabel *m_time = nullptr;
     DTK_WIDGET_NAMESPACE::DPushButton *m_toggle = nullptr;
 };

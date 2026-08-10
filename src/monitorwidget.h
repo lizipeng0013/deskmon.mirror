@@ -11,12 +11,14 @@
 class QTimer;
 class QLabel;
 class QVBoxLayout;
+class QToolButton;
 class SystemMonitor;
 class Config;
 class MetricRow;
 class NetWidget;
 class Sparkline;
 class Pomodoro;
+class PowerIcon;
 
 /**
  * @brief 主悬浮监控窗口
@@ -60,6 +62,7 @@ private:
     void togglePomodoro();        // 托盘切换番茄钟行显隐
     void checkAlerts(double cpu, double gpu);  // 阈值告警（边沿触发）
     void notifyAlert(const QString &message);  // 系统通知发告警
+    void cycleOpacity();          // 点击 ◐ 循环切换透明度
 
     std::unique_ptr<Config> m_config;
     std::unique_ptr<SystemMonitor> m_monitor;
@@ -81,7 +84,8 @@ private:
     NetWidget *m_netWidget = nullptr;
     Sparkline *m_sparkline = nullptr;   // CPU/GPU 60s 趋势（加分项）
     Pomodoro *m_pomodoro = nullptr;     // 番茄钟（加分项，默认隐藏）
-    QLabel *m_titleDot = nullptr;       // 标题活跃色圆点
+    PowerIcon *m_titleIcon = nullptr;   // 标题电力图标（金色）
+    QToolButton *m_opacityBtn = nullptr; // 标题 ◐ 透明度切换
 
     bool m_gpuAvailable = false;
     bool m_cpuAlerted = false;          // 告警边沿状态

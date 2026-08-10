@@ -20,6 +20,7 @@ public:
 
     void setSpeed(double uploadBps, double downloadBps);
     void setIps(const QStringList &ips);
+    void setArrowColors(const QColor &up, const QColor &down);  // 主题跟随
 
 private:
     static QString formatSpeed(double bps);

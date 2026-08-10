@@ -25,3 +25,15 @@ QVector<QColor> ThemeColors::metricColors()
         QColor::fromHsvF(48.0 / 360.0, s, v),    // 系统盘：黄
     };
 }
+
+QPair<QColor, QColor> ThemeColors::netArrowColors()
+{
+    auto *helper = DGuiApplicationHelper::instance();
+    const bool dark = helper->themeType() == DGuiApplicationHelper::DarkType;
+    const double v = dark ? 0.8 : 0.55;
+    const double s = 0.85;
+    return {
+        QColor::fromHsvF(28.0 / 360.0, s, v),    // 上传：橙
+        QColor::fromHsvF(150.0 / 360.0, s, v),   // 下载：绿
+    };
+}

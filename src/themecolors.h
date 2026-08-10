@@ -6,6 +6,7 @@
 
 #include <QColor>
 #include <QVector>
+#include <QPair>
 
 /**
  * @brief 主题跟随的指标配色
@@ -18,6 +19,9 @@ namespace ThemeColors {
 
 // 顺序：CPU / 内存 / GPU / 系统盘
 QVector<QColor> metricColors();
+
+// 网络箭头配色：(上传, 下载)，随明/暗主题调亮度
+QPair<QColor, QColor> netArrowColors();
 
 } // namespace ThemeColors
 
