@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+# 本机 DTK6/Qt6 工具链位于 ~/jm-prefix/usr（非系统包，含自带 cmake/编译器）。
+# 1) LD_LIBRARY_PATH：该工具链的 cmake 需要 librhash 等运行库，dh 各步骤都要继承；
+#    用 override 避免覆盖 fakeroot 注入的搜索路径（deb 打包时 dh 在 fakeroot 下运行，
+#    fakeroot 通过 LD_LIBRARY_PATH 提供 libfakeroot 预加载库路径）。
+# 2) PATH：确保优先使用工具链的 cmake（系统未装 cmake 包）。
+# 系统环境已装齐 dev 包时，可整体删除下面两行 export 回退到系统默认工具链。
+export LD_LIBRARY_PATH := /usr/lib/x86_64-linux-gnu:$(HOME)/jm-prefix/usr/lib/x86_64-linux-gnu$(if $(LD_LIBRARY_PATH),:$(LD_LIBRARY_PATH))
+export PATH := $(HOME)/jm-prefix/usr/bin:$(PATH)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- -DCMAKE_PREFIX_PATH="$(HOME)/jm-prefix/usr"

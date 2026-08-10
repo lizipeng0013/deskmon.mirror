@@ -310,6 +310,26 @@ install(FILES icons/deskmon.svg
         RENAME deskmon.svg)
 ```
 
+### 8.1 实际打包步骤（已跑通）
+
+> 本机工具链在 `~/jm-prefix/usr`（Qt6.8 + DTK6.7.44，非 apt 包），系统未装 dev 头文件，故用 `-d` 跳过 `dpkg-checkbuilddeps`。
+
+```bash
+cd deskmon-dtk
+# 构建（fakeroot 需关闭 sandbox，故脱离 ZCode 沙箱执行）
+dpkg-buildpackage -b -us -uc -d
+# 或仅重打 binary 阶段（已有 build stamp）
+fakeroot debian/rules binary
+# 产物在父目录，归档到 dist/
+mkdir -p dist && cp ../deskmon_*.deb dist/
+```
+
+### 8.2 排错备忘
+
+- **`debhelper compat level specified both in debian/compat and debian/control`** → 删 `debian/compat`，只保留 `control` 里的 `debhelper-compat (= 13)`（debhelper ≥ 13 要求）。
+- **`cmake: error while loading shared libraries: librhash.so.0`** → jm-prefix 自带 cmake 需要自己的运行库，`debian/rules` 顶部 `export LD_LIBRARY_PATH` 指向 jm-prefix lib。
+- **`fakeroot ... libfakeroot-sysv.so ... cannot be preloaded` + `dh_testroot: You must run this as root`** → fakeroot 通过 `LD_LIBRARY_PATH=PATHS` 把 `libfakeroot/` 目录传给子进程做 LD_PRELOAD；**不能在 rules 里 `:=` 覆盖 `LD_LIBRARY_PATH`**，否则丢掉 fakeroot 注入的路径导致 preload 失效。修法是 `:=` 前先用 `$(if $(LD_LIBRARY_PATH),:$(LD_LIBRARY_PATH))` 追加保留父进程值。
+
 ---
 
 ## 九、待办清单
@@ -330,7 +350,7 @@ install(FILES icons/deskmon.svg
 - [x] 设计矢量图标（`icons/deskmon.svg` + `deskmon-tray.svg` + `deskmon-symbolic.svg`；多尺寸 PNG 已生成）
 - [x] 快速启动脚本（`start.sh`：build/run/clean 三模式）
 - [x] 标题栏隐藏按钮（✕ 隐藏到托盘）
-- [ ] deb 打包
+- [x] deb 打包（`debian/` 源码包 + `dpkg-buildpackage -b`；输出 `dist/deskmon_1.0.0-1_amd64.deb`，`Installed-Size: 345 KB` 由 `dpkg-gencontrol` 自动计算；`Recommends: nvidia-smi` 软依赖；依赖由 `dh_shlibdeps` 自动生成 `libdtk6* / libqt6*`）
 - [ ] 录演示视频、截图
 - [ ] 论坛发帖提交
 

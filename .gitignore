@@ -1,7 +1,23 @@
 # 构建产物
 build/
+obj-x86_64-linux-gnu/
 *.o
 *.moc
+
+# deb 打包产物（dpkg-buildpackage 输出到父目录，这里兜底）
+*.deb
+*.changes
+*.buildinfo
+*.dsc
+*.tar.*
+# debhelper 在源码树内生成的临时文件
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/deskmon/
+debian/*.substvars
+debian/*.postinst.debhelper
+debian/*.postrm.debhelper
+debian/files
 
 # IDE / 编辑器
 .cache/

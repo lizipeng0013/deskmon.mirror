@@ -1,0 +1,28 @@
+Source: deskmon
+Section: utils
+Priority: optional
+Maintainer: kookboy <kookboy@users.noreply.github.com>
+Build-Depends:
+ cmake,
+ debhelper-compat (= 13),
+ pkg-config,
+ qt6-base-dev,
+ qt6-tools-dev,
+ libdtk6core-dev,
+ libdtk6gui-dev,
+ libdtk6widget-dev,
+Standards-Version: 4.6.2
+Homepage: https://github.com/kookboy/deskmon
+
+Package: deskmon
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+Recommends:
+ nvidia-smi,
+Description: Desktop system monitor for deepin (DTK6 native)
+ 实时显示 CPU/GPU/内存/磁盘/网络 使用情况的桌面悬浮监控小工具，
+ 原生 DTK6/Qt6 实现，自动跟随系统亮/暗主题。
+ Features: floating frameless widget, tray menu, GPU VRAM management,
+ process manager, pomodoro timer, sparkline trends and threshold alerts.

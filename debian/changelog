@@ -1,0 +1,7 @@
+deskmon (1.0.0-1) unstable; urgency=medium
+
+  * 首版发布：DTK6 原生系统监控悬浮小窗
+  * 功能：CPU/内存/GPU/磁盘/网络监控、托盘菜单、GPU 显存/进程管理、
+    配置持久化、开机自启动、番茄钟、迷你折线图、主题自动跟随、阈值告警
+
+ -- kookboy <kookboy@users.noreply.github.com>  Mon, 10 Aug 2026 23:55:00 +0800

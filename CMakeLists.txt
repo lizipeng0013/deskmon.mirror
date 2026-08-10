@@ -51,8 +51,25 @@ target_link_libraries(deskmon PRIVATE
 
 # 安装规则（deb 打包用）
 install(TARGETS deskmon RUNTIME DESTINATION bin)
+# 主图标：scalable SVG（系统主题 QIcon::fromTheme("deskmon") 的解析来源）
 install(FILES icons/deskmon.svg
         DESTINATION share/icons/hicolor/scalable/apps
         RENAME deskmon.svg)
+# 主图标：多尺寸 PNG（hicolor 主题按 size 查找，含 16/22/24/32/48/64/128/256）
+install(DIRECTORY icons/hicolor/
+        DESTINATION share/icons/hicolor/
+        FILES_MATCHING PATTERN "*.png"
+        PATTERN "*" EXCLUDE)
+# 托盘 / symbolic 变体（备选资源，随包发布）
+install(FILES icons/deskmon-tray.svg
+        DESTINATION share/icons/hicolor/scalable/apps
+        RENAME deskmon-tray.svg)
+install(FILES icons/deskmon-symbolic.svg
+        DESTINATION share/icons/hicolor/scalable/apps
+        RENAME deskmon-symbolic.svg)
+install(DIRECTORY icons/tray/
+        DESTINATION share/icons/deskmon/tray/)
+install(DIRECTORY icons/symbolic/
+        DESTINATION share/icons/deskmon/symbolic/)
 install(FILES deskmon.desktop
         DESTINATION share/applications)
