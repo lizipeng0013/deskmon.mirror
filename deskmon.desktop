@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=DeskMon
+Name[zh_CN]=桌面监控
+Comment=桌面系统监控小工具
+Comment[zh_CN]=实时显示 CPU/GPU/内存/磁盘/网络使用情况
+Exec=deskmon
+Icon=deskmon
+Terminal=false
+Categories=System;Monitor;Utility;
+X-GNOME-Autostart-enabled=true

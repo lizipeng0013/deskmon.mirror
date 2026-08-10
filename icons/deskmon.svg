@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- 深色圆底 + 活跃色圆环 + 中心仪表盘箭头 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a2f3a"/>
+      <stop offset="1" stop-color="#14171d"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="120" fill="url(#bg)"/>
+  <!-- 背景环槽 -->
+  <circle cx="128" cy="128" r="86" fill="none" stroke="#3a4050" stroke-width="18"/>
+  <!-- 活跃色进度环（约 75%） -->
+  <path d="M 128 42 A 86 86 0 1 1 58 172" fill="none" stroke="#0081ff" stroke-width="18"
+        stroke-linecap="round"/>
+  <!-- 中心圆点 -->
+  <circle cx="128" cy="128" r="38" fill="#1b1f27"/>
+  <circle cx="128" cy="128" r="12" fill="#00d4ff"/>
+</svg>

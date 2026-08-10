@@ -1,0 +1,246 @@
+// SPDX-FileCopyrightText: 2026 kookboy
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "systemmonitor.h"
+
+#include <QFile>
+#include <QTextStream>
+#include <QDebug>
+#include <QDir>
+#include <QStorageInfo>
+#include <QNetworkInterface>
+#include <QHostAddress>
+#include <QAbstractSocket>
+#include <QRegularExpression>
+
+#include <sys/sysinfo.h>
+
+SystemMonitor::SystemMonitor(QObject *parent)
+    : QObject(parent)
+{
+    m_gpu = new NvidiaGpu(this);
+    connect(m_gpu, &NvidiaGpu::availabilityChanged,
+            this, &SystemMonitor::gpuAvailabilityChanged);
+}
+
+bool SystemMonitor::gpuAvailable() const { return m_gpu->available(); }
+QString SystemMonitor::gpuName() const { return m_gpu->name(); }
+
+// ---------------- CPU ----------------
+
+bool SystemMonitor::readCpuTimes(CpuTimes &t) const
+{
+    QFile f(QStringLiteral("/proc/stat"));
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+    QString line = f.readLine().trimmed();
+    if (!line.startsWith(QLatin1String("cpu")))
+        return false;
+
+    const QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    // parts: cpu user nice system idle iowait irq softirq steal ...
+    if (parts.size() < 8)
+        return false;
+    t.user = parts[1].toULongLong();
+    t.nice = parts[2].toULongLong();
+    t.system = parts[3].toULongLong();
+    t.idle = parts[4].toULongLong();
+    t.iowait = parts[5].toULongLong();
+    t.irq = parts[6].toULongLong();
+    t.softirq = parts[7].toULongLong();
+    return true;
+}
+
+double SystemMonitor::cpuUsage()
+{
+    static CpuTimes prev;
+    static bool havePrev = false;
+
+    CpuTimes cur;
+    if (!readCpuTimes(cur))
+        return -1;
+
+    if (!havePrev) {
+        prev = cur;
+        havePrev = true;
+        return 0;
+    }
+
+    const qulonglong idleDelta = (cur.idle - prev.idle) + (cur.iowait - prev.iowait);
+    const qulonglong totalDelta =
+        (cur.user - prev.user) + (cur.nice - prev.nice) + (cur.system - prev.system)
+        + (cur.idle - prev.idle) + (cur.iowait - prev.iowait)
+        + (cur.irq - prev.irq) + (cur.softirq - prev.softirq);
+    prev = cur;
+
+    if (totalDelta == 0)
+        return 0;
+    return qBound(0.0, 100.0 * (1.0 - double(idleDelta) / double(totalDelta)), 100.0);
+}
+
+double SystemMonitor::cpuTemp() const
+{
+    // sysfs 热区：取标着 core/package 或第一个非 0 读数
+    double best = -1;
+    QDir thermalDir(QStringLiteral("/sys/class/thermal"));
+    const QStringList zones = thermalDir.entryList({QStringLiteral("thermal_zone*")}, QDir::Dirs);
+    for (const QString &zone : zones) {
+        QFile typeFile(thermalDir.filePath(zone + QStringLiteral("/type")));
+        QString type;
+        if (typeFile.open(QIODevice::ReadOnly))
+            type = QString::fromUtf8(typeFile.readLine()).trimmed().toLower();
+
+        QFile tempFile(thermalDir.filePath(zone + QStringLiteral("/temp")));
+        if (!tempFile.open(QIODevice::ReadOnly))
+            continue;
+        const double milli = tempFile.readAll().trimmed().toDouble();
+        if (milli <= 0)
+            continue;
+        const double celsius = milli / 1000.0;
+
+        // 优先 core/package/cpu 相关热区
+        if (type.contains(QLatin1String("core")) || type.contains(QLatin1String("package"))
+            || type.contains(QLatin1String("cpu")))
+            return celsius;
+        if (best < 0)
+            best = celsius;
+    }
+    return best;
+}
+
+// ---------------- 内存 / 磁盘 ----------------
+
+void SystemMonitor::memoryUsage(double &percent, qint64 &usedMB, qint64 &totalMB) const
+{
+    struct sysinfo si {};
+    if (sysinfo(&si) != 0) {
+        percent = -1;
+        usedMB = totalMB = 0;
+        return;
+    }
+    const qint64 total = qint64(si.totalram) * si.mem_unit;
+    const qint64 free = (qint64(si.freeram) + qint64(si.bufferram) + qint64(si.sharedram)) * si.mem_unit;
+    const qint64 used = total - free;
+    totalMB = total / (1024 * 1024);
+    usedMB = used / (1024 * 1024);
+    percent = total > 0 ? 100.0 * double(used) / double(total) : 0;
+}
+
+void SystemMonitor::diskUsage(double &percent, qint64 &usedGB, qint64 &totalGB) const
+{
+    const QStorageInfo root(QStringLiteral("/"));
+    if (!root.isValid()) {
+        percent = -1;
+        usedGB = totalGB = 0;
+        return;
+    }
+    totalGB = root.bytesTotal() / (1024 * 1024 * 1024);
+    usedGB = (root.bytesTotal() - root.bytesFree()) / (1024 * 1024 * 1024);
+    percent = root.bytesTotal() > 0 ? 100.0 * double(root.bytesTotal() - root.bytesFree()) / double(root.bytesTotal()) : 0;
+}
+
+// ---------------- 网络 ----------------
+
+QPair<double, double> SystemMonitor::networkSpeed()
+{
+    // /proc/net/dev 汇总所有网卡（跳过 lo）
+    QFile f(QStringLiteral("/proc/net/dev"));
+    quint64 recv = 0, sent = 0;
+    if (f.open(QIODevice::ReadOnly)) {
+        const QStringList lines = QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'));
+        for (const QString &line : lines) {
+            const QString trimmed = line.trimmed();
+            if (trimmed.isEmpty() || trimmed.contains(QLatin1String("Inter-|")))
+                continue;
+            const int colon = trimmed.indexOf(QLatin1Char(':'));
+            if (colon <= 0)
+                continue;
+            const QString iface = trimmed.left(colon);
+            if (iface == QLatin1String("lo"))
+                continue;
+            const QStringList nums = trimmed.mid(colon + 1).split(QLatin1Char(' '), Qt::SkipEmptyParts);
+            if (nums.size() >= 9) {
+                recv += nums[0].toULongLong();   // 收包字节
+                sent += nums[8].toULongLong();   // 发包字节
+            }
+        }
+    }
+
+    const bool first = !m_netTimer.isValid();
+    if (first) {
+        m_netTimer.start();
+        m_lastNet = {recv, sent};
+        return {0, 0};
+    }
+    const qint64 elapsedMs = m_netTimer.restart();
+    const double up = double(sent - m_lastNet.bytesSent) * 1000.0 / qMax<qint64>(elapsedMs, 1);
+    const double down = double(recv - m_lastNet.bytesRecv) * 1000.0 / qMax<qint64>(elapsedMs, 1);
+    m_lastNet = {recv, sent};
+    return {qMax(0.0, up), qMax(0.0, down)};
+}
+
+QStringList SystemMonitor::ipAddresses() const
+{
+    QStringList ips;
+    const QList<QNetworkInterface> ifaces = QNetworkInterface::allInterfaces();
+    for (const QNetworkInterface &iface : ifaces) {
+        if (!(iface.flags() & QNetworkInterface::IsUp) || iface.flags() & QNetworkInterface::IsLoopBack)
+            continue;
+        for (const QNetworkAddressEntry &entry : iface.addressEntries()) {
+            const QHostAddress addr = entry.ip();
+            if (addr.protocol() == QAbstractSocket::IPv4Protocol)
+                ips << addr.toString();
+        }
+    }
+    return ips;
+}
+
+// ---------------- GPU ----------------
+
+double SystemMonitor::smoothValue(double value, QVector<double> &history)
+{
+    if (value < 0)
+        return value;
+    history.append(value);
+    while (history.size() > kSmoothWindow)
+        history.removeFirst();
+    double sum = 0;
+    for (double v : history)
+        sum += v;
+    return sum / history.size();
+}
+
+SystemMonitor::GpuStats SystemMonitor::gpuStats()
+{
+    GpuStats s;
+    if (!m_gpu->available())
+        return s;
+
+    const QStringList fields = {QStringLiteral("utilization.gpu"),
+                                QStringLiteral("memory.used"),
+                                QStringLiteral("memory.total"),
+                                QStringLiteral("temperature.gpu"),
+                                QStringLiteral("utilization.encoder"),
+                                QStringLiteral("utilization.decoder")};
+    const QStringList values = m_gpu->query(fields);
+    if (values.size() < 4)
+        return s;
+
+    const double rawUtil = values[0].toDouble();
+    s.memUsedMB = qint64(values[1].toDouble());
+    s.memTotalMB = qint64(values[2].toDouble());
+    s.temp = values[3].toDouble();
+
+    const double encoder = values.size() > 4 ? values[4].toDouble() : 0;
+    const double decoder = values.size() > 5 ? values[5].toDouble() : 0;
+
+    s.util = smoothValue(rawUtil, m_gpuUtilHistory);
+    s.encoderUtil = smoothValue(encoder, m_encoderHistory);
+    s.decoderUtil = smoothValue(decoder, m_decoderHistory);
+    return s;
+}
+
+QVector<NvidiaGpu::GpuProcess> SystemMonitor::gpuProcesses()
+{
+    return m_gpu->processes();
+}

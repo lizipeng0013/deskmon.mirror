@@ -1,0 +1,13 @@
+# 构建产物
+build/
+*.o
+*.moc
+
+# IDE / 编辑器
+.cache/
+.vscode/
+.idea/
+compile_commands.json
+
+# 运行时配置
+*.log
