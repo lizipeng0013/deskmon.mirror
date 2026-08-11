@@ -34,6 +34,8 @@ public:
     bool showDisk() const;
     bool autostart() const;
     bool stayOnTop() const;
+    QString displayMode() const;        // "full" / "mini"
+    void setDisplayMode(const QString &mode);
 
     static QString configDir();
     static QString configFile();

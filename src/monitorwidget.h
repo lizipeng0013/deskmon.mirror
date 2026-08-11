@@ -5,14 +5,18 @@
 #define DESKMON_MONITORWIDGET_H
 
 #include <DWidget>
+#include <DBlurEffectWidget>
 
 #include <memory>
 
 class QTimer;
 class QLabel;
 class QVBoxLayout;
+class QHBoxLayout;
 class QToolButton;
 class QFrame;
+class QStackedLayout;
+class QAction;
 class SystemMonitor;
 class Config;
 class MetricRow;
@@ -20,6 +24,7 @@ class NetWidget;
 class Sparkline;
 class Pomodoro;
 class PowerIcon;
+class MiniBar;
 
 /**
  * @brief 主悬浮监控窗口
@@ -64,6 +69,7 @@ private:
     void checkAlerts(double cpu, double gpu);  // 阈值告警（边沿触发）
     void notifyAlert(const QString &message);  // 系统通知发告警
     void cycleOpacity();          // 点击 ◐ 循环切换透明度
+    void setDisplayMode(const QString &mode);  // 切换完整/迷你模式
 
     std::unique_ptr<Config> m_config;
     std::unique_ptr<SystemMonitor> m_monitor;
@@ -87,10 +93,19 @@ private:
     Pomodoro *m_pomodoro = nullptr;     // 番茄钟（加分项，默认隐藏）
     PowerIcon *m_titleIcon = nullptr;   // 标题电力图标（金色）
     QToolButton *m_opacityBtn = nullptr; // 标题 ◐ 透明度切换
+    QToolButton *m_collapseBtn = nullptr; // 标题 ⊟ 收缩为迷你条
 
     QFrame *m_titleSep = nullptr;       // 标题与指标区分隔线
     QFrame *m_metricsSep = nullptr;     // 指标区与趋势区分隔线
     QFrame *m_netSep = nullptr;         // 网络区与番茄钟分隔线
+
+    QWidget *m_fullPanel = nullptr;     // 完整模式内容容器（QStackedLayout 页 1）
+    MiniBar *m_miniBar = nullptr;        // 迷你模式浮动条（QStackedLayout 页 2）
+    QStackedLayout *m_stack = nullptr;  // full/mini 内容互换
+    DTK_WIDGET_NAMESPACE::DBlurEffectWidget *m_container = nullptr;  // 磨砂容器（切模式时调圆角）
+
+    QAction *m_fullModeAct = nullptr;   // 托盘「显示模式」勾选项，随 setDisplayMode 同步
+    QAction *m_miniModeAct = nullptr;
 
     bool m_gpuAvailable = false;
     bool m_cpuAlerted = false;          // 告警边沿状态

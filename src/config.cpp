@@ -21,6 +21,7 @@ const QVariantMap Config::s_defaults = {
     {QStringLiteral("show_disk"), true},
     {QStringLiteral("autostart"), false},
     {QStringLiteral("stay_on_top"), true},
+    {QStringLiteral("display_mode"), QStringLiteral("full")},
 };
 
 Config::Config()
@@ -111,6 +112,8 @@ bool Config::showGpu() const { return m_data.value(QStringLiteral("show_gpu")).t
 bool Config::showDisk() const { return m_data.value(QStringLiteral("show_disk")).toBool(); }
 bool Config::autostart() const { return m_data.value(QStringLiteral("autostart")).toBool(); }
 bool Config::stayOnTop() const { return m_data.value(QStringLiteral("stay_on_top")).toBool(); }
+QString Config::displayMode() const { return m_data.value(QStringLiteral("display_mode")).toString(); }
+void Config::setDisplayMode(const QString &mode) { set(QStringLiteral("display_mode"), mode); }
 
 bool Config::isAutostartEnabled() const
 {

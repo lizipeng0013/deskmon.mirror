@@ -13,6 +13,7 @@
 #include "widgets/netwidget.h"
 #include "widgets/sparkline.h"
 #include "widgets/pomodoro.h"
+#include "widgets/minibar.h"
 
 #include <DNotifySender>
 
@@ -26,6 +27,7 @@
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QStackedLayout>
 #include <QFrame>
 #include <QMouseEvent>
 #include <QPainter>
@@ -125,37 +127,48 @@ void MonitorWidget::setupUi()
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
-    auto *container = new DBlurEffectWidget(this);
-    container->setBlurEnabled(true);
-    container->setRadius(10);
-    container->setBlurRectXRadius(10);
-    container->setBlurRectYRadius(10);
+    m_container = new DBlurEffectWidget(this);
+    m_container->setBlurEnabled(true);
+    m_container->setRadius(10);
+    m_container->setBlurRectXRadius(10);
+    m_container->setBlurRectYRadius(10);
     // 遮罩色跟随系统明/暗主题（之前固定深色导致亮色主题下不跟随）
-    container->setMaskColor(DBlurEffectWidget::AutoColor);
-    container->setMaskAlpha(170);
-    container->setBlendMode(DBlurEffectWidget::BehindWindowBlend);
-    mainLayout->addWidget(container);
+    m_container->setMaskColor(DBlurEffectWidget::AutoColor);
+    m_container->setMaskAlpha(170);
+    m_container->setBlendMode(DBlurEffectWidget::BehindWindowBlend);
+    mainLayout->addWidget(m_container);
 
-    auto *contentLayout = new QVBoxLayout(container);
+    // full/mini 内容互换：QStackedLayout 在两个面板间切，窗口行为逻辑不动
+    m_stack = new QStackedLayout(m_container);
+    m_stack->setContentsMargins(0, 0, 0, 0);
+
+    // ---------------- 完整模式面板 ----------------
+    m_fullPanel = new QWidget(m_container);
+    m_stack->addWidget(m_fullPanel);
+
+    auto *contentLayout = new QVBoxLayout(m_fullPanel);
     contentLayout->setContentsMargins(16, 14, 16, 12);
     contentLayout->setSpacing(6);
 
     // 标题行：电力图标 + 应用名（随主题活跃色）
     auto *titleLayout = new QHBoxLayout;
     titleLayout->setSpacing(6);
-    m_titleIcon = new PowerIcon(container);
+    m_titleIcon = new PowerIcon(m_fullPanel);
     m_titleIcon->setColor(QColor(QStringLiteral("#e8b020")));  // 金黄色
-    auto *titleLabel = new QLabel(tr("系统监控"), container);
+    auto *titleLabel = new QLabel(tr("系统监控"), m_fullPanel);
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSizeF(titleFont.pointSizeF() + 1);
     titleLabel->setFont(titleFont);
+    // 保证标题文字不被右侧按钮挤压缩
+    const QFontMetrics tFm(titleFont);
+    titleLabel->setMinimumWidth(tFm.horizontalAdvance(tr("系统监控")) + 4);
     titleLayout->addWidget(m_titleIcon);
     titleLayout->addWidget(titleLabel);
-    titleLayout->addStretch();
+    titleLayout->addStretch(1);  // 标题与按钮组之间留白，按钮统一偏右
 
-    // 对比度（透明度）快捷切换：点击循环
-    m_opacityBtn = new QToolButton(container);
+    // 三个按钮紧凑成组：◐ 透明度 → ⊟ 收缩 → ✕ 隐藏
+    m_opacityBtn = new QToolButton(m_fullPanel);
     m_opacityBtn->setText(QStringLiteral("◐"));
     m_opacityBtn->setToolTip(tr("点击切换透明度（当前 %1%）")
                                  .arg(qRound(m_config->opacity() * 100)));
@@ -164,8 +177,17 @@ void MonitorWidget::setupUi()
     connect(m_opacityBtn, &QToolButton::clicked, this, &MonitorWidget::cycleOpacity);
     titleLayout->addWidget(m_opacityBtn);
 
+    // 收缩为迷你条：点击切 mini 模式（在 ◐ 和 ✕ 之间）
+    m_collapseBtn = new QToolButton(m_fullPanel);
+    m_collapseBtn->setText(QStringLiteral("⊟"));
+    m_collapseBtn->setToolTip(tr("收缩为迷你条"));
+    m_collapseBtn->setCursor(Qt::PointingHandCursor);
+    m_collapseBtn->setAutoRaise(true);
+    connect(m_collapseBtn, &QToolButton::clicked, this, [this] { setDisplayMode(QStringLiteral("mini")); });
+    titleLayout->addWidget(m_collapseBtn);
+
     // 隐藏按钮：点击隐藏窗口到托盘（托盘左键可唤回）
-    auto *hideBtn = new QToolButton(container);
+    auto *hideBtn = new QToolButton(m_fullPanel);
     hideBtn->setText(QStringLiteral("✕"));
     hideBtn->setToolTip(tr("隐藏到托盘（托盘左键点击唤回）"));
     hideBtn->setCursor(Qt::PointingHandCursor);
@@ -176,34 +198,34 @@ void MonitorWidget::setupUi()
     contentLayout->addLayout(titleLayout);
 
     // 分隔线：标题区 / 指标区
-    m_titleSep = new QFrame(container);
+    m_titleSep = new QFrame(m_fullPanel);
     m_titleSep->setFrameShape(QFrame::HLine);
     m_titleSep->setFixedHeight(1);
     contentLayout->addWidget(m_titleSep);
 
     // 指标行（每项一行，独立配色，紧凑省高度；颜色由主题派生，见 applyThemeColors）
-    m_cpuRow = new MetricRow(tr("CPU"), QColor(QStringLiteral("#0081ff")), container);
+    m_cpuRow = new MetricRow(tr("CPU"), QColor(QStringLiteral("#0081ff")), m_fullPanel);
     contentLayout->addWidget(m_cpuRow);
 
-    m_memRow = new MetricRow(tr("内存"), QColor(QStringLiteral("#00a870")), container);
+    m_memRow = new MetricRow(tr("内存"), QColor(QStringLiteral("#00a8b8")), m_fullPanel);
     contentLayout->addWidget(m_memRow);
 
     // GPU 行始终创建，可见性由 updateRowsVisibility 控制（降级策略 + 设置项）
     m_gpuAvailable = m_monitor->gpuAvailable();
-    m_gpuRow = new MetricRow(tr("GPU"), QColor(QStringLiteral("#ff6b9d")), container);
+    m_gpuRow = new MetricRow(tr("GPU"), QColor(QStringLiteral("#ff6b9d")), m_fullPanel);
     contentLayout->addWidget(m_gpuRow);
 
-    m_diskRow = new MetricRow(tr("系统盘"), QColor(QStringLiteral("#ffd93d")), container);
+    m_diskRow = new MetricRow(tr("系统盘"), QColor(QStringLiteral("#ffd93d")), m_fullPanel);
     contentLayout->addWidget(m_diskRow);
 
     // 分隔线：指标区 / 趋势区
-    m_metricsSep = new QFrame(container);
+    m_metricsSep = new QFrame(m_fullPanel);
     m_metricsSep->setFrameShape(QFrame::HLine);
     m_metricsSep->setFixedHeight(1);
     contentLayout->addWidget(m_metricsSep);
 
     // CPU/GPU 趋势迷你折线（加分项）：窗口始终约 60 秒，缓冲随刷新间隔自适应
-    m_sparkline = new Sparkline(container);
+    m_sparkline = new Sparkline(m_fullPanel);
     m_sparkline->setSeriesCount(2);
     m_sparkline->setBufferSize(qMax(12, 60000 / qMax(1, m_config->refreshInterval())));
     m_sparkline->setSeriesName(0, tr("CPU"));
@@ -211,28 +233,38 @@ void MonitorWidget::setupUi()
     contentLayout->addWidget(m_sparkline);
 
     // 网络
-    m_netWidget = new NetWidget(container);
+    m_netWidget = new NetWidget(m_fullPanel);
     contentLayout->addWidget(m_netWidget);
 
     // 分隔线：网络区 / 工具区（番茄钟显示时才出现）
-    m_netSep = new QFrame(container);
+    m_netSep = new QFrame(m_fullPanel);
     m_netSep->setFrameShape(QFrame::HLine);
     m_netSep->setFixedHeight(1);
     m_netSep->setVisible(false);
     contentLayout->addWidget(m_netSep);
 
     // 番茄钟（加分项，默认隐藏，托盘可切换）
-    m_pomodoro = new Pomodoro(container);
+    m_pomodoro = new Pomodoro(m_fullPanel);
     m_pomodoro->setVisible(false);
     contentLayout->addWidget(m_pomodoro);
 
     // 底部右侧留出宽度调整热区（右下角 16px）
-    auto *resizeHint = new QLabel(tr("⟋"), container);
+    auto *resizeHint = new QLabel(tr("⟋"), m_fullPanel);
     resizeHint->setAlignment(Qt::AlignRight | Qt::AlignBottom);
     QFont hintFont = resizeHint->font();
     hintFont.setPointSizeF(hintFont.pointSizeF() - 3);
     resizeHint->setFont(hintFont);
     contentLayout->addWidget(resizeHint, 0, Qt::AlignRight);
+
+    // ---------------- 迷你模式浮动条 ----------------
+    m_miniBar = new MiniBar(m_container);
+    m_stack->addWidget(m_miniBar);
+    connect(m_miniBar, &MiniBar::expandRequested, this, [this] { setDisplayMode(QStringLiteral("full")); });
+    connect(m_miniBar, &MiniBar::opacityClicked, this, &MonitorWidget::cycleOpacity);
+    connect(m_miniBar, &MiniBar::hideRequested, this, &QWidget::hide);
+
+    // 按持久化的模式选初始页（默认完整）
+    setDisplayMode(m_config->displayMode());
 }
 
 void MonitorWidget::setupTray()
@@ -294,6 +326,22 @@ void MonitorWidget::setupTray()
             setOpacity(pct / 100.0);
         });
     }
+
+    // 显示模式子菜单（完整 / 迷你）
+    QMenu *modeMenu = menu->addMenu(tr("显示模式"));
+    auto *modeGroup = new QActionGroup(modeMenu);
+    modeGroup->setExclusive(true);
+    const QString curMode = m_config->displayMode().isEmpty() ? QStringLiteral("full") : m_config->displayMode();
+    m_fullModeAct = modeMenu->addAction(tr("完整窗口"));
+    m_fullModeAct->setCheckable(true);
+    m_fullModeAct->setChecked(curMode == QStringLiteral("full"));
+    modeGroup->addAction(m_fullModeAct);
+    connect(m_fullModeAct, &QAction::triggered, this, [this] { setDisplayMode(QStringLiteral("full")); });
+    m_miniModeAct = modeMenu->addAction(tr("迷你条"));
+    m_miniModeAct->setCheckable(true);
+    m_miniModeAct->setChecked(curMode == QStringLiteral("mini"));
+    modeGroup->addAction(m_miniModeAct);
+    connect(m_miniModeAct, &QAction::triggered, this, [this] { setDisplayMode(QStringLiteral("mini")); });
 
     // GPU 显存管理（无 N 卡时隐藏）
     if (m_gpuAvailable) {
@@ -359,8 +407,12 @@ void MonitorWidget::applyConfig()
 void MonitorWidget::updateRowsVisibility()
 {
     // GPU 行：无 N 卡或用户关闭 → 隐藏（降级策略 + 设置项）
-    m_gpuRow->setVisible(m_gpuAvailable && m_config->showGpu());
-    m_diskRow->setVisible(m_config->showDisk());
+    const bool gpu = m_gpuAvailable && m_config->showGpu();
+    const bool disk = m_config->showDisk();
+    m_gpuRow->setVisible(gpu);
+    m_diskRow->setVisible(disk);
+    if (m_miniBar)
+        m_miniBar->setRowsVisible(gpu, disk);
 }
 
 void MonitorWidget::applyStayOnTop()
@@ -406,6 +458,14 @@ void MonitorWidget::applyThemeColors()
         m_sparkline->setColor(0, colors.value(0));
         m_sparkline->setColor(1, colors.value(2));
     }
+    // 迷你条指标色与完整窗同源
+    if (m_miniBar) {
+        for (int i = 0; i < 4; ++i)
+            m_miniBar->setMetricColor(i, colors.value(i));
+        const auto arrows = ThemeColors::netArrowColors();
+        m_miniBar->setNetColors(arrows.first, arrows.second);
+        m_miniBar->updateLabelColors();
+    }
     // 标题电力图标固定金黄色（不随主题色），无需在此更新
     // 网络箭头：上传橙、下载绿
     if (m_netWidget) {
@@ -447,6 +507,50 @@ void MonitorWidget::cycleOpacity()
         }
     }
     setOpacity(presets.at((idx + 1) % presets.size()));
+}
+
+void MonitorWidget::setDisplayMode(const QString &mode)
+{
+    if (!m_stack || (mode != QStringLiteral("full") && mode != QStringLiteral("mini")))
+        return;
+
+    const QPoint oldPos = pos();   // 切换时左上角锚定不动，仅尺寸变化
+    const bool isMini = (mode == QStringLiteral("mini"));
+
+    m_stack->setCurrentWidget(isMini ? static_cast<QWidget *>(m_miniBar) : m_fullPanel);
+
+    // 圆角：迷你条更圆，胶囊感；完整窗沿用 10
+    if (m_container) {
+        const int r = isMini ? 14 : 10;
+        m_container->setRadius(r);
+        m_container->setBlurRectXRadius(r);
+        m_container->setBlurRectYRadius(r);
+    }
+
+    // 尺寸：迷你固定高度，宽度按 sizeHint 并 clamp 到 [180,400]；
+    // 完整恢复可变高度，宽度回配置值，高度由布局撑开（首次用当前高度保底）
+    if (isMini) {
+        const int w = qBound(180, m_miniBar->sizeHint().width(), 400);
+        setFixedHeight(28);
+        resize(w, 28);  // 高度已被 setFixedHeight 锁定，第二参数仅占位
+    } else {
+        setMinimumHeight(0);
+        setMaximumHeight(QWIDGETSIZE_MAX);
+        // 完整模式宽度：取配置宽度与内容 sizeHint 宽度的较大值，
+        // 避免 window_width 过窄导致标题栏 addStretch 剩余空间不足、按钮无法偏右
+        const int contentW = m_fullPanel->sizeHint().width();
+        const int w = qMax(m_config->windowWidth(), contentW);
+        resize(w, qMax(height(), m_fullPanel->sizeHint().height()));
+    }
+
+    // 仅在窗口已显示的运行时切换才锚定左上角；构造期 pos() 无意义，由 positionWindow() 统一定位
+    if (isVisible())
+        move(oldPos);
+    m_config->setDisplayMode(mode);
+
+    // 同步托盘「显示模式」勾选，避免从标题栏按钮/双击切换后脱节
+    if (m_fullModeAct) m_fullModeAct->setChecked(!isMini);
+    if (m_miniModeAct) m_miniModeAct->setChecked(isMini);
 }
 
 void MonitorWidget::positionWindow()
@@ -499,8 +603,8 @@ void MonitorWidget::refresh()
     }
 
     // GPU
+    const auto gpuStats = m_monitor->gpuStats();
     if (m_gpuRow) {
-        const auto gpuStats = m_monitor->gpuStats();
         gpu = gpuStats.util;
         if (gpu >= 0) {
             m_gpuRow->setValue(int(gpu + 0.5));
@@ -508,6 +612,8 @@ void MonitorWidget::refresh()
                                                 .arg(gpuStats.memUsedMB / 1024.0, 0, 'f', 1)
                                                 .arg(gpuStats.memTotalMB / 1024.0, 0, 'f', 1));
         }
+    } else {
+        gpu = gpuStats.util;  // 无 GPU 行时仍取值供迷你条/折线使用
     }
 
     // 系统盘
@@ -531,6 +637,32 @@ void MonitorWidget::refresh()
         if (cpu >= 0) m_sparkline->setValue(0, cpu);
         if (gpu >= 0) m_sparkline->setValue(1, gpu);
     }
+
+    // 迷你条：不可见时跳过，省 CPU
+    if (m_miniBar && m_stack && m_stack->currentWidget() == m_miniBar) {
+        if (cpu >= 0) {
+            m_miniBar->setMetric(0, int(cpu + 0.5));
+            m_miniBar->setMetricInfo(0, tr("温度 %1℃").arg(int(m_monitor->cpuTemp())));
+        }
+        if (memPercent >= 0) {
+            m_miniBar->setMetric(1, int(memPercent + 0.5));
+            m_miniBar->setMetricInfo(1, QStringLiteral("%1/%2G").arg(memUsed / 1024.0, 0, 'f', 1)
+                                                               .arg(memTotal / 1024.0, 0, 'f', 1));
+        }
+        if (gpu >= 0) {
+            m_miniBar->setMetric(2, int(gpu + 0.5));
+            m_miniBar->setMetricInfo(2, QStringLiteral("%1℃·%2/%3G").arg(int(gpuStats.temp))
+                                                                    .arg(gpuStats.memUsedMB / 1024.0, 0, 'f', 1)
+                                                                    .arg(gpuStats.memTotalMB / 1024.0, 0, 'f', 1));
+        }
+        if (diskPercent >= 0) {
+            m_miniBar->setMetric(3, int(diskPercent + 0.5));
+            m_miniBar->setMetricInfo(3, QStringLiteral("%1/%2G").arg(diskUsed / 1.0, 0, 'f', 1)
+                                                               .arg(diskTotal / 1.0, 0, 'f', 1));
+        }
+        m_miniBar->setNetSpeed(speed.first, speed.second);
+    }
+
     checkAlerts(cpu, gpu);
 }
 
@@ -627,9 +759,10 @@ void MonitorWidget::mouseMoveEvent(QMouseEvent *e)
         e->accept();
         return;
     }
-    // 进入右下角热区显示调整光标
+    // 进入右下角热区显示调整光标（仅完整模式；迷你条固定宽度）
+    const bool fullMode = m_stack && m_stack->currentWidget() == m_fullPanel;
     const QPoint local = e->position().toPoint();
-    const bool inCorner = local.x() >= width() - 16 && local.y() >= height() - 16;
+    const bool inCorner = fullMode && local.x() >= width() - 16 && local.y() >= height() - 16;
     setCursor(inCorner ? Qt::SizeHorCursor : Qt::ArrowCursor);
     DWidget::mouseMoveEvent(e);
 }

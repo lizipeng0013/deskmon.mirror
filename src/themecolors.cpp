@@ -20,7 +20,7 @@ QVector<QColor> ThemeColors::metricColors()
 
     return {
         active.isValid() && active.alpha() > 0 ? active : QColor(QStringLiteral("#0081ff")),  // CPU：活跃色
-        QColor::fromHsvF(150.0 / 360.0, s, v),   // 内存：绿
+        QColor::fromHsvF(180.0 / 360.0, s, v),   // 内存：青
         QColor::fromHsvF(330.0 / 360.0, s, v),   // GPU：粉
         QColor::fromHsvF(48.0 / 360.0, s, v),    // 系统盘：黄
     };

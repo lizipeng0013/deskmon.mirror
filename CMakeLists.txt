@@ -33,6 +33,7 @@ add_executable(deskmon
     src/widgets/netwidget.cpp
     src/widgets/sparkline.cpp
     src/widgets/pomodoro.cpp
+    src/widgets/minibar.cpp
     src/monitorwidget.cpp
 )
 
