@@ -21,6 +21,19 @@ SystemMonitor::SystemMonitor(QObject *parent)
     m_gpu = new NvidiaGpu(this);
     connect(m_gpu, &NvidiaGpu::availabilityChanged,
             this, &SystemMonitor::gpuAvailabilityChanged);
+    connect(m_gpu, &NvidiaGpu::availabilityChanged,
+            this, &SystemMonitor::onGpuAvailabilityChanged);
+    connect(m_gpu, &NvidiaGpu::queryFinished,
+            this, &SystemMonitor::onGpuQueryFinished);
+    connect(m_gpu, &NvidiaGpu::processesFinished,
+            this, &SystemMonitor::onGpuProcessesFinished);
+
+    // GPU 后台刷新定时器：与 UI refresh 解耦，间隔 2s，避免每秒同步调用 nvidia-smi
+    m_gpuTimer.setInterval(2000);
+    connect(&m_gpuTimer, &QTimer::timeout, this, &SystemMonitor::refreshGpu);
+
+    // 异步探测 nvidia-smi（完成后 onGpuAvailabilityChanged 决定是否启动定时器）
+    m_gpu->probeAsync();
 }
 
 bool SystemMonitor::gpuAvailable() const { return m_gpu->available(); }
@@ -53,25 +66,22 @@ bool SystemMonitor::readCpuTimes(CpuTimes &t) const
 
 double SystemMonitor::cpuUsage()
 {
-    static CpuTimes prev;
-    static bool havePrev = false;
-
     CpuTimes cur;
     if (!readCpuTimes(cur))
         return -1;
 
-    if (!havePrev) {
-        prev = cur;
-        havePrev = true;
+    if (!m_havePrevCpu) {
+        m_prevCpu = cur;
+        m_havePrevCpu = true;
         return 0;
     }
 
-    const qulonglong idleDelta = (cur.idle - prev.idle) + (cur.iowait - prev.iowait);
+    const qulonglong idleDelta = (cur.idle - m_prevCpu.idle) + (cur.iowait - m_prevCpu.iowait);
     const qulonglong totalDelta =
-        (cur.user - prev.user) + (cur.nice - prev.nice) + (cur.system - prev.system)
-        + (cur.idle - prev.idle) + (cur.iowait - prev.iowait)
-        + (cur.irq - prev.irq) + (cur.softirq - prev.softirq);
-    prev = cur;
+        (cur.user - m_prevCpu.user) + (cur.nice - m_prevCpu.nice) + (cur.system - m_prevCpu.system)
+        + (cur.idle - m_prevCpu.idle) + (cur.iowait - m_prevCpu.iowait)
+        + (cur.irq - m_prevCpu.irq) + (cur.softirq - m_prevCpu.softirq);
+    m_prevCpu = cur;
 
     if (totalDelta == 0)
         return 0;
@@ -228,7 +238,64 @@ QStringList SystemMonitor::ipAddresses() const
     return ips;
 }
 
-// ---------------- GPU ----------------
+// ---------------- GPU（异步查询 + 缓存） ----------------
+
+void SystemMonitor::onGpuAvailabilityChanged(bool available)
+{
+    if (available) {
+        if (!m_gpuTimer.isActive())
+            m_gpuTimer.start();
+        refreshGpu();   // 立即查一次，缩短首屏延迟
+    } else {
+        m_gpuTimer.stop();
+        m_gpuStatsCache = GpuStats();
+        m_gpuProcsCache.clear();
+        m_gpuUtilHistory.clear();
+        m_encoderHistory.clear();
+        m_decoderHistory.clear();
+    }
+}
+
+void SystemMonitor::refreshGpu()
+{
+    if (!m_gpu->available())
+        return;
+    static const QStringList fields = {QStringLiteral("utilization.gpu"),
+                                        QStringLiteral("memory.used"),
+                                        QStringLiteral("memory.total"),
+                                        QStringLiteral("temperature.gpu"),
+                                        QStringLiteral("utilization.encoder"),
+                                        QStringLiteral("utilization.decoder")};
+    m_gpu->queryAsync(fields);
+    m_gpu->queryProcessesAsync();
+}
+
+void SystemMonitor::onGpuQueryFinished(const QStringList &fields, const QStringList &values)
+{
+    Q_UNUSED(fields)
+    if (values.size() < 4)
+        return;
+    GpuStats s;
+    const double rawUtil = values[0].toDouble();
+    s.memUsedMB = qint64(values[1].toDouble());
+    s.memTotalMB = qint64(values[2].toDouble());
+    s.temp = values[3].toDouble();
+
+    const double encoder = values.size() > 4 ? values[4].toDouble() : 0;
+    const double decoder = values.size() > 5 ? values[5].toDouble() : 0;
+
+    s.util = smoothValue(rawUtil, m_gpuUtilHistory);
+    s.encoderUtil = smoothValue(encoder, m_encoderHistory);
+    s.decoderUtil = smoothValue(decoder, m_decoderHistory);
+    m_gpuStatsCache = s;
+    Q_EMIT gpuStatsReady(s);
+}
+
+void SystemMonitor::onGpuProcessesFinished(const QVector<NvidiaGpu::GpuProcess> &procs)
+{
+    m_gpuProcsCache = procs;
+    Q_EMIT gpuProcessesReady(procs);
+}
 
 double SystemMonitor::smoothValue(double value, QVector<double> &history)
 {
@@ -243,37 +310,5 @@ double SystemMonitor::smoothValue(double value, QVector<double> &history)
     return sum / history.size();
 }
 
-SystemMonitor::GpuStats SystemMonitor::gpuStats()
-{
-    GpuStats s;
-    if (!m_gpu->available())
-        return s;
-
-    const QStringList fields = {QStringLiteral("utilization.gpu"),
-                                QStringLiteral("memory.used"),
-                                QStringLiteral("memory.total"),
-                                QStringLiteral("temperature.gpu"),
-                                QStringLiteral("utilization.encoder"),
-                                QStringLiteral("utilization.decoder")};
-    const QStringList values = m_gpu->query(fields);
-    if (values.size() < 4)
-        return s;
-
-    const double rawUtil = values[0].toDouble();
-    s.memUsedMB = qint64(values[1].toDouble());
-    s.memTotalMB = qint64(values[2].toDouble());
-    s.temp = values[3].toDouble();
-
-    const double encoder = values.size() > 4 ? values[4].toDouble() : 0;
-    const double decoder = values.size() > 5 ? values[5].toDouble() : 0;
-
-    s.util = smoothValue(rawUtil, m_gpuUtilHistory);
-    s.encoderUtil = smoothValue(encoder, m_encoderHistory);
-    s.decoderUtil = smoothValue(decoder, m_decoderHistory);
-    return s;
-}
-
-QVector<NvidiaGpu::GpuProcess> SystemMonitor::gpuProcesses()
-{
-    return m_gpu->processes();
-}
+SystemMonitor::GpuStats SystemMonitor::gpuStats() const { return m_gpuStatsCache; }
+QVector<NvidiaGpu::GpuProcess> SystemMonitor::gpuProcesses() const { return m_gpuProcsCache; }

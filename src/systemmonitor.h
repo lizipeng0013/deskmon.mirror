@@ -8,13 +8,15 @@
 
 #include <QObject>
 #include <QElapsedTimer>
+#include <QTimer>
 #include <QVector>
 
 /**
  * @brief 系统资源监控数据层（CPU/内存/磁盘/网络/GPU）
  *
  * 数据来源：/proc、sysfs、QStorageInfo、QNetworkInterface，无需 psutil。
- * GPU 通过 nvidia-smi 查询（见 NvidiaGpu）。
+ * GPU 通过 nvidia-smi 异步查询（见 NvidiaGpu），结果缓存到 m_gpuStatsCache，
+ * UI 层读缓存即可，不阻塞主线程。
  */
 class SystemMonitor : public QObject
 {
@@ -33,7 +35,7 @@ public:
     QPair<double, double> networkSpeed();   // (上传, 下载) 字节/秒
     QStringList ipAddresses() const;
 
-    // GPU（带滑动平均平滑）
+    // GPU：直接读缓存（查询在后台异步进行，不阻塞 UI）
     struct GpuStats {
         double util = -1;      // %
         qint64 memUsedMB = 0;
@@ -42,21 +44,35 @@ public:
         double encoderUtil = 0;
         double decoderUtil = 0;
     };
-    GpuStats gpuStats();
-
-    // 占用 GPU 显存的进程列表
-    QVector<NvidiaGpu::GpuProcess> gpuProcesses();
+    GpuStats gpuStats() const;
+    QVector<NvidiaGpu::GpuProcess> gpuProcesses() const;
 
 signals:
     void gpuAvailabilityChanged(bool available);
+    // 后台 GPU 查询完成时发出，UI 可据此刷新（也可直接读缓存）
+    void gpuStatsReady(const GpuStats &stats);
+    void gpuProcessesReady(const QVector<NvidiaGpu::GpuProcess> &procs);
+
+private slots:
+    void onGpuAvailabilityChanged(bool available);
+    void onGpuQueryFinished(const QStringList &fields, const QStringList &values);
+    void onGpuProcessesFinished(const QVector<NvidiaGpu::GpuProcess> &procs);
+    void refreshGpu();
 
 private:
     NvidiaGpu *m_gpu = nullptr;
+    QTimer m_gpuTimer;                  // GPU 后台刷新定时器（与 UI refresh 解耦）
 
-    // CPU 计算状态
+    // GPU 缓存（由后台异步查询更新）
+    GpuStats m_gpuStatsCache;
+    QVector<NvidiaGpu::GpuProcess> m_gpuProcsCache;
+
+    // CPU 计算状态（从函数静态挪到成员，避免多实例互相污染）
     struct CpuTimes {
         qulonglong user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0;
     };
+    CpuTimes m_prevCpu;
+    bool m_havePrevCpu = false;
     bool readCpuTimes(CpuTimes &t) const;
 
     // 网络计数状态

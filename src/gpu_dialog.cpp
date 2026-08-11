@@ -138,8 +138,10 @@ void GpuDialog::killProcess(int pid, const QString &name)
     const int killBtn = dlg->addButton(tr("终止"), false, DDialog::ButtonWarning);
     dlg->addButton(tr("取消"), true, DDialog::ButtonNormal);
     connect(dlg, &DDialog::buttonClicked, this, [this, dlg, killBtn, pid](int index, const QString &) {
-        if (index == killBtn && ProcessMgr::kill(pid))
+        if (index == killBtn) {
+            ProcessMgr::kill(pid);
             refreshProcesses();
+        }
     });
     dlg->exec();
     dlg->deleteLater();
@@ -163,11 +165,8 @@ void GpuDialog::releaseAll()
     connect(dlg, &DDialog::buttonClicked, this, [this, dlg, killBtn](int index, const QString &) {
         if (index != killBtn)
             return;
-        int killed = 0;
-        for (const auto &p : m_pids) {
-            if (ProcessMgr::kill(p.first))
-                ++killed;
-        }
+        for (const auto &p : m_pids)
+            ProcessMgr::kill(p.first);
         refreshProcesses();
     });
     dlg->exec();

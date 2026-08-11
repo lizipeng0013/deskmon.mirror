@@ -95,6 +95,13 @@ void Config::set(const QString &key, const QVariant &value)
     save();
 }
 
+void Config::setMany(const QVariantMap &items)
+{
+    for (auto it = items.constBegin(); it != items.constEnd(); ++it)
+        m_data.insert(it.key(), it.value());
+    save();
+}
+
 double Config::opacity() const { return m_data.value(QStringLiteral("opacity")).toDouble(); }
 int Config::refreshInterval() const { return m_data.value(QStringLiteral("refresh_interval")).toInt(); }
 int Config::positionX() const { return m_data.value(QStringLiteral("position_x")).toInt(); }

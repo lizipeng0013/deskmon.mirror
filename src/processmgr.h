@@ -28,8 +28,9 @@ public:
     // 全量进程列表（CPU% 需两次调用间差分，首次返回 0）
     QVector<ProcessInfo> list();
 
-    // 终止进程：SIGTERM → 等待 → SIGKILL；返回是否成功
-    static bool kill(int pid);
+    // 终止进程：发 SIGTERM（非阻塞），3s 后未退则 SIGKILL 兜底。
+    // 不阻塞 UI 线程；进程实际退出由调用方定时刷新列表时反映。
+    static void kill(int pid);
 
 private:
     // pid -> (进程累计 jiffies, 记录时刻 msec)

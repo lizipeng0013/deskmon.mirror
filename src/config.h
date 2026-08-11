@@ -21,6 +21,9 @@ public:
     QVariant get(const QString &key, const QVariant &defaultValue = QVariant()) const;
     void set(const QString &key, const QVariant &value);
 
+    // 批量写入：合并到内存后只落盘一次（避免多次 set 各自 save 的重复磁盘写）
+    void setMany(const QVariantMap &items);
+
     // 便捷访问
     double opacity() const;
     int refreshInterval() const;

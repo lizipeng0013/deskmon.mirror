@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QThread>
+#include <QTimer>
 
 #include <signal.h>
 #include <unistd.h>
@@ -114,19 +115,19 @@ QVector<ProcessInfo> ProcessMgr::list()
     return result;
 }
 
-bool ProcessMgr::kill(int pid)
+void ProcessMgr::kill(int pid)
 {
     if (::kill(pid, SIGTERM) != 0)
-        return false;
-    // 等待退出（最多 3s），未退则 SIGKILL
-    const QDir proc(QStringLiteral("/proc"));
-    for (int i = 0; i < 30; ++i) {
-        if (!QFile::exists(proc.filePath(QString::number(pid))))
-            return true;
-        QThread::msleep(100);
-    }
-    if (::kill(pid, SIGKILL) != 0)
-        return false;
-    QThread::msleep(100);
-    return !QFile::exists(proc.filePath(QString::number(pid)));
+        return;
+    // 3s 后若仍存活则 SIGKILL 兜底（非阻塞：QTimer 在主线程事件循环触发，
+    // 不再像旧实现那样用 QThread::msleep 阻塞 UI 长达 3s/进程）。
+    auto *t = new QTimer();
+    t->setSingleShot(true);
+    t->setInterval(3000);
+    QObject::connect(t, &QTimer::timeout, t, [t, pid]() {
+        if (QFile::exists(QStringLiteral("/proc/%1").arg(pid)))
+            ::kill(pid, SIGKILL);
+        t->deleteLater();
+    });
+    t->start();
 }

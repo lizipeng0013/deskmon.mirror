@@ -100,10 +100,13 @@ void SettingsDialog::buildUi()
 
 void SettingsDialog::saveToConfig()
 {
-    m_config->set(QStringLiteral("opacity"), m_opacitySlider->value() / 100.0);
-    m_config->set(QStringLiteral("refresh_interval"), m_refreshCombo->currentData());
-    m_config->set(QStringLiteral("show_gpu"), m_showGpuCheck->isChecked());
-    m_config->set(QStringLiteral("show_disk"), m_showDiskCheck->isChecked());
-    m_config->set(QStringLiteral("stay_on_top"), m_stayOnTopCheck->isChecked());
+    // 批量写入：一次落盘（原来逐项 set 触发 6 次磁盘写）
+    m_config->setMany({
+        {QStringLiteral("opacity"), m_opacitySlider->value() / 100.0},
+        {QStringLiteral("refresh_interval"), m_refreshCombo->currentData()},
+        {QStringLiteral("show_gpu"), m_showGpuCheck->isChecked()},
+        {QStringLiteral("show_disk"), m_showDiskCheck->isChecked()},
+        {QStringLiteral("stay_on_top"), m_stayOnTopCheck->isChecked()},
+    });
     m_config->setAutostart(m_autostartCheck->isChecked());
 }

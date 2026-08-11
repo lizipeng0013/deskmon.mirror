@@ -210,9 +210,9 @@ void Sparkline::paintEvent(QPaintEvent *)
             fillPath.lineTo(leftPad, topPad + plotH);
             fillPath.closeSubpath();
             QLinearGradient grad(0, topPad, 0, topPad + plotH);
-            QColor base = m_colors[s];
-            base.setAlpha(dark ? 90 : 70);
-            grad.setColorAt(0, base);
+            QColor baseColor = m_colors[s];
+            baseColor.setAlpha(dark ? 90 : 70);
+            grad.setColorAt(0, baseColor);
             QColor transparent = m_colors[s];
             transparent.setAlpha(0);
             grad.setColorAt(1, transparent);

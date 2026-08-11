@@ -155,8 +155,8 @@ void ProcessDialog::killProcess(const ProcessInfo &proc)
     dlg->addButton(tr("取消"), true, DDialog::ButtonNormal);
     connect(dlg, &DDialog::buttonClicked, this, [this, dlg, killBtn, proc](int index, const QString &) {
         if (index == killBtn) {
-            if (ProcessMgr::kill(proc.pid))
-                refreshProcesses();
+            ProcessMgr::kill(proc.pid);
+            refreshProcesses();
         }
     });
     dlg->exec();

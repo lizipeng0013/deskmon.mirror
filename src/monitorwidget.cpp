@@ -95,6 +95,12 @@ MonitorWidget::MonitorWidget(QWidget *parent)
     connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged,
             this, [this](DGuiApplicationHelper::ColorType) { applyThemeColors(); });
 
+    // GPU 探测异步完成时更新可见性（探测在 SystemMonitor 构造时启动）
+    connect(m_monitor.get(), &SystemMonitor::gpuAvailabilityChanged, this, [this](bool available) {
+        m_gpuAvailable = available;
+        updateRowsVisibility();
+    });
+
     // 定时刷新
     m_timer = new QTimer(this);
     m_timer->setInterval(m_config->refreshInterval());
@@ -234,8 +240,8 @@ void MonitorWidget::setupTray()
     // 图标：优先主题图标 → 本地 PNG → 程序绘制回退
     QIcon icon = QIcon::fromTheme(QStringLiteral("deskmon"));
     if (icon.isNull()) {
-        // 尝试从程序目录/icons 加载多尺寸 PNG
-        const QString iconDir = QApplication::applicationDirPath() + QStringLiteral("/../icons/hicolor");
+        // 尝试从程序目录/../share/icons/hicolor 加载多尺寸 PNG（安装布局为 /usr/bin/../share/...）
+        const QString iconDir = QApplication::applicationDirPath() + QStringLiteral("/../share/icons/hicolor");
         for (int sz : {256, 128, 64, 48, 32, 22, 16}) {
             const QString path = QStringLiteral("%1/%2x%2/apps/deskmon.png").arg(iconDir).arg(sz);
             if (QFile::exists(path)) {
@@ -263,7 +269,7 @@ void MonitorWidget::setupTray()
     auto *tray = new QSystemTrayIcon(icon, this);
     tray->setToolTip(tr("系统监控 DeskMon"));
 
-    auto *menu = new QMenu;
+    auto *menu = new QMenu(this);
     QAction *showAction = menu->addAction(tr("显示/隐藏"));
     connect(showAction, &QAction::triggered, this, [this] {
         if (isVisible())
@@ -510,7 +516,9 @@ void MonitorWidget::refresh()
     m_monitor->diskUsage(diskPercent, diskUsed, diskTotal);
     if (diskPercent >= 0) {
         m_diskRow->setValue(int(diskPercent + 0.5));
-        m_diskRow->setInfo(QStringLiteral("%1/%2G").arg(diskUsed).arg(diskTotal));
+        m_diskRow->setInfo(QStringLiteral("%1/%2G")
+                              .arg(diskUsed / 1.0, 0, 'f', 1)
+                              .arg(diskTotal / 1.0, 0, 'f', 1));
     }
 
     // 网络

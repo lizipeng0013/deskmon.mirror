@@ -30,10 +30,6 @@ NetWidget::NetWidget(QWidget *parent)
     labelFont.setPointSizeF(labelFont.pointSizeF() - 1);
     QFont valueFont = m_up->font();
     valueFont.setPointSizeF(valueFont.pointSizeF() - 1);
-
-    const DPalette pal = DPaletteHelper::instance()->palette(this);
-    const QColor tipsColor = pal.color(DPalette::TextTips);
-    const QString tipsCss = QStringLiteral("color: %1;").arg(tipsColor.isValid() ? tipsColor.name() : QStringLiteral("#909399"));
     for (QLabel *l : {m_upLabel, m_downLabel, m_ipLabel}) {
         l->setFont(labelFont);
     }
