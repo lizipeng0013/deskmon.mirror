@@ -1,10 +1,3 @@
-deskmon (1.0.3) unstable; urgency=medium
-
-  * 迷你模式视觉优化：圆点与首字母染色、百分比中性色、降低色盘饱和度
-  * 字母与百分比之间增加 2px 间距，提升可读性
-
- -- kookboy <kookboy@users.noreply.github.com>  Wed, 12 Aug 2026 14:00:00 +0800
-
 deskmon (1.0.2) unstable; urgency=medium
 
   * 完整/迷你模式切换时自动贴右下角边缘（距边 4px，跟随当前屏不跨屏跳）
