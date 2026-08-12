@@ -514,8 +514,8 @@ void MonitorWidget::setDisplayMode(const QString &mode)
     if (!m_stack || (mode != QStringLiteral("full") && mode != QStringLiteral("mini")))
         return;
 
-    const QPoint oldPos = pos();   // 切换时左上角锚定不动，仅尺寸变化
     const bool isMini = (mode == QStringLiteral("mini"));
+    const bool wasMini = (m_stack->currentWidget() == m_miniBar);  // 区分真切换与同模式重复点击
 
     m_stack->setCurrentWidget(isMini ? static_cast<QWidget *>(m_miniBar) : m_fullPanel);
 
@@ -543,9 +543,11 @@ void MonitorWidget::setDisplayMode(const QString &mode)
         resize(w, qMax(height(), m_fullPanel->sizeHint().height()));
     }
 
-    // 仅在窗口已显示的运行时切换才锚定左上角；构造期 pos() 无意义，由 positionWindow() 统一定位
-    if (isVisible())
-        move(oldPos);
+    // 仅运行时真正切换模式时贴右下角；构造期或同模式重复点击不重定位
+    if (isVisible() && wasMini != isMini) {
+        snapToBottomRight();
+        savePosition();   // 同步持久化，避免重启后位置与视觉不一致
+    }
     m_config->setDisplayMode(mode);
 
     // 同步托盘「显示模式」勾选，避免从标题栏按钮/双击切换后脱节
@@ -566,6 +568,17 @@ void MonitorWidget::positionWindow()
         const QRect avail = screen->availableGeometry();
         move(avail.right() - width() - 20, avail.bottom() - height() - 20);
     }
+}
+
+void MonitorWidget::snapToBottomRight()
+{
+    // 贴右下角：以窗口当前所在屏幕为准（多显示器不跨屏跳），距边缘 4px
+    QScreen *screen = QGuiApplication::screenAt(pos());
+    if (!screen) screen = QGuiApplication::primaryScreen();
+    if (!screen) return;
+    const QRect avail = screen->availableGeometry();
+    constexpr int kSnapMargin = 4;
+    move(avail.right() - width() - kSnapMargin, avail.bottom() - height() - kSnapMargin);
 }
 
 void MonitorWidget::showEvent(QShowEvent *e)

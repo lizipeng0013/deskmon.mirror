@@ -58,6 +58,7 @@ private:
     void setupUi();
     void setupTray();
     void positionWindow();
+    void snapToBottomRight();   // 模式切换后贴右下角（当前屏，4px 吸边）
     void savePosition();
     void applyConfig();
     void applyThemeColors();      // 主题跟随：重算并套用指标色
