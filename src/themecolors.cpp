@@ -19,10 +19,19 @@ QVector<QColor> ThemeColors::metricColors()
     const double v = dark ? 0.76 : 0.52;
     const double s = 0.55;
 
+    // CPU 亮色主题下调亮度，避免在浅底上过浓
+    const QColor cpuColor = active.isValid() && active.alpha() > 0
+        ? (dark ? active : active.darker(108))
+        : QColor(QStringLiteral("#5B8FF9"));
+    // GPU 亮色单独处理：更亮、更低饱和，提升浅紫灰底上的可读性
+    const QColor gpuColor = dark
+        ? QColor::fromHsvF(340.0 / 360.0, s, v)
+        : QColor::fromHsvF(340.0 / 360.0, 0.42, 0.62);
+
     return {
-        active.isValid() && active.alpha() > 0 ? active : QColor(QStringLiteral("#5B8FF9")),  // CPU：活跃色
+        cpuColor,                                       // CPU：活跃色
         QColor::fromHsvF(170.0 / 360.0, s, v),         // 内存：薄荷 teal
-        QColor::fromHsvF(340.0 / 360.0, s, v),         // GPU：灰粉 rose
+        gpuColor,                                       // GPU：灰粉 rose
         QColor::fromHsvF(40.0 / 360.0, s + 0.05, v + (dark ? 0.02 : 0.03)),  // 系统盘：琥珀 amber
     };
 }
@@ -33,7 +42,7 @@ QPair<QColor, QColor> ThemeColors::netArrowColors()
     const bool dark = helper->themeType() == DGuiApplicationHelper::DarkType;
     const double v = dark ? 0.74 : 0.52;
     return {
-        QColor::fromHsvF(20.0 / 360.0, 0.50, v),   // 上传：暖陶土 terracotta
+        QColor::fromHsvF(270.0 / 360.0, 0.50, v),   // 上传：紫（与系统盘琥珀黄拉开色相距离）
         QColor::fromHsvF(150.0 / 360.0, 0.45, v),  // 下载：鼠尾草 sage
     };
 }

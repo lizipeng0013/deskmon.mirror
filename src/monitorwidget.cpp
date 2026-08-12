@@ -179,8 +179,8 @@ void MonitorWidget::setupUi()
 
     // 收缩为迷你条：点击切 mini 模式（在 ◐ 和 ✕ 之间）
     m_collapseBtn = new QToolButton(m_fullPanel);
-    m_collapseBtn->setText(QStringLiteral("⊟"));
-    m_collapseBtn->setToolTip(tr("收缩为迷你条"));
+    m_collapseBtn->setText(QStringLiteral("⊡"));
+    m_collapseBtn->setToolTip(tr("收起为单行迷你浮动条"));
     m_collapseBtn->setCursor(Qt::PointingHandCursor);
     m_collapseBtn->setAutoRaise(true);
     connect(m_collapseBtn, &QToolButton::clicked, this, [this] { setDisplayMode(QStringLiteral("mini")); });
@@ -235,6 +235,12 @@ void MonitorWidget::setupUi()
     // 网络
     m_netWidget = new NetWidget(m_fullPanel);
     contentLayout->addWidget(m_netWidget);
+
+    // 分隔线：折线图 / 网络区（始终显示，增强区块边界）
+    m_netTopSep = new QFrame(m_fullPanel);
+    m_netTopSep->setFrameShape(QFrame::HLine);
+    m_netTopSep->setFixedHeight(1);
+    contentLayout->addWidget(m_netTopSep);
 
     // 分隔线：网络区 / 工具区（番茄钟显示时才出现）
     m_netSep = new QFrame(m_fullPanel);
@@ -478,6 +484,7 @@ void MonitorWidget::applyThemeColors()
     const QColor frameColor = pal.color(DPalette::FrameBorder);
     setSeparatorColor(m_titleSep, frameColor);
     setSeparatorColor(m_metricsSep, frameColor);
+    setSeparatorColor(m_netTopSep, frameColor);
     setSeparatorColor(m_netSep, frameColor);
 }
 

@@ -109,15 +109,15 @@ void Sparkline::paintEvent(QPaintEvent *)
     const double plotW = qMax(10.0, w - leftPad - rightPad);
     const double plotH = qMax(10.0, h - topPad - bottomPad);
 
-    // 背景框：轻微底色 + 圆角边框
+    // 背景框：轻微底色 + 圆角边框（增强 alpha，提升区块边界感）
     const QRectF bgRect(0, 0, w, h);
     QColor bgColor = frameColor;
-    bgColor.setAlpha(dark ? 30 : 18);
+    bgColor.setAlpha(dark ? 55 : 35);
     p.setPen(Qt::NoPen);
     p.setBrush(bgColor);
     p.drawRoundedRect(bgRect, 6, 6);
     QColor borderColor = frameColor;
-    borderColor.setAlpha(dark ? 60 : 40);
+    borderColor.setAlpha(dark ? 90 : 55);
     p.setPen(QPen(borderColor, 1));
     p.setBrush(Qt::NoBrush);
     p.drawRoundedRect(bgRect.adjusted(0.5, 0.5, -0.5, -0.5), 6, 6);

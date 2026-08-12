@@ -98,6 +98,7 @@ private:
 
     QFrame *m_titleSep = nullptr;       // 标题与指标区分隔线
     QFrame *m_metricsSep = nullptr;     // 指标区与趋势区分隔线
+    QFrame *m_netTopSep = nullptr;      // 趋势图与网络区分隔线
     QFrame *m_netSep = nullptr;         // 网络区与番茄钟分隔线
 
     QWidget *m_fullPanel = nullptr;     // 完整模式内容容器（QStackedLayout 页 1）
