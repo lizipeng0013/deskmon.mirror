@@ -79,9 +79,9 @@ void MiniBar::buildCell(Cell &c, const QString &name, const QString &letter, QWi
     row->setContentsMargins(0, 0, 0, 0);
 
     c.dot = new QLabel(QStringLiteral("●"), c.container);
-    c.dot->setFixedWidth(12);
+    c.dot->setFixedWidth(10);
     QFont dotFont = c.dot->font();
-    dotFont.setPointSizeF(dotFont.pointSizeF() - 2);
+    dotFont.setPointSizeF(dotFont.pointSizeF() - 3);   // 圆点再小一号，降低侵入感
     c.dot->setFont(dotFont);
 
     c.letter = new QLabel(letter, c.container);
@@ -102,6 +102,7 @@ void MiniBar::buildCell(Cell &c, const QString &name, const QString &letter, QWi
 
     row->addWidget(c.dot);
     row->addWidget(c.letter);
+    row->addSpacing(2);   // 字母与百分比稍微拉开，避免贴太近
     row->addWidget(c.percent);
 
     // tooltip 只挂在容器上，子 label 不设 -> Qt 冒泡，整个 cell 区域悬停都显示
@@ -133,10 +134,10 @@ void MiniBar::setMetricColor(int idx, const QColor &color)
     if (idx < 0 || idx >= 4)
         return;
     m_cells[idx].color = color;
+    // 圆点和字母作为类别标识一起染色；百分比保持中性，确保数据可读
     const QString css = QStringLiteral("color: %1;").arg(color.name());
     m_cells[idx].dot->setStyleSheet(css);
     m_cells[idx].letter->setStyleSheet(css);
-    m_cells[idx].percent->setStyleSheet(css);
 }
 
 void MiniBar::setRowsVisible(bool gpu, bool disk)
@@ -169,6 +170,15 @@ void MiniBar::setNetColors(const QColor &up, const QColor &down)
 void MiniBar::updateLabelColors()
 {
     const DPalette pal = DPaletteHelper::instance()->palette(this);
+
+    // 百分比单独用主题标题色，保持数据区域中性；字母色由 setMetricColor 管理
+    const QColor titleColor = pal.color(DPalette::TextTitle);
+    const QString titleCss = QStringLiteral("color: %1;").arg(
+        titleColor.isValid() ? titleColor.name() : QStringLiteral("#303133"));
+    for (const auto &c : m_cells)
+        c.percent->setStyleSheet(titleCss);
+
+    // 网络速度值用提示色
     const QColor tipsColor = pal.color(DPalette::TextTips);
     const QString tipsCss = QStringLiteral("color: %1;").arg(
         tipsColor.isValid() ? tipsColor.name() : QStringLiteral("#909399"));

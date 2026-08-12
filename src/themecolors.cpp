@@ -14,15 +14,16 @@ QVector<QColor> ThemeColors::metricColors()
     const QColor active = helper->applicationPalette().color(DPalette::Highlight);
     const bool dark = helper->themeType() == DGuiApplicationHelper::DarkType;
 
-    // 亮度：暗主题需提亮、亮主题压暗，保证两种背景下进度条都清晰
-    const double v = dark ? 0.82 : 0.58;
-    const double s = 0.85;
+    // 迷你条空间极小，饱和度过高会显得刺眼、细碎；降饱和并微调色相，
+    // 让四个指标在 DTK 半透明蓝底上更和谐。
+    const double v = dark ? 0.76 : 0.52;
+    const double s = 0.55;
 
     return {
-        active.isValid() && active.alpha() > 0 ? active : QColor(QStringLiteral("#0081ff")),  // CPU：活跃色
-        QColor::fromHsvF(180.0 / 360.0, s, v),   // 内存：青
-        QColor::fromHsvF(330.0 / 360.0, s, v),   // GPU：粉
-        QColor::fromHsvF(48.0 / 360.0, s, v),    // 系统盘：黄
+        active.isValid() && active.alpha() > 0 ? active : QColor(QStringLiteral("#5B8FF9")),  // CPU：活跃色
+        QColor::fromHsvF(170.0 / 360.0, s, v),         // 内存：薄荷 teal
+        QColor::fromHsvF(340.0 / 360.0, s, v),         // GPU：灰粉 rose
+        QColor::fromHsvF(40.0 / 360.0, s + 0.05, v + (dark ? 0.02 : 0.03)),  // 系统盘：琥珀 amber
     };
 }
 
@@ -30,10 +31,9 @@ QPair<QColor, QColor> ThemeColors::netArrowColors()
 {
     auto *helper = DGuiApplicationHelper::instance();
     const bool dark = helper->themeType() == DGuiApplicationHelper::DarkType;
-    const double v = dark ? 0.8 : 0.55;
-    const double s = 0.85;
+    const double v = dark ? 0.74 : 0.52;
     return {
-        QColor::fromHsvF(28.0 / 360.0, s, v),    // 上传：橙
-        QColor::fromHsvF(150.0 / 360.0, s, v),   // 下载：绿
+        QColor::fromHsvF(20.0 / 360.0, 0.50, v),   // 上传：暖陶土 terracotta
+        QColor::fromHsvF(150.0 / 360.0, 0.45, v),  // 下载：鼠尾草 sage
     };
 }
