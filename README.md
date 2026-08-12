@@ -39,7 +39,7 @@ dpkg-buildpackage -b -us -uc -d
 mkdir -p dist && cp ../deskmon_*.deb dist/
 
 # 安装到系统（apt 会自动解析 Recommends 拉装 nvidia-smi）
-sudo apt install ./dist/deskmon_1.0.0-1_amd64.deb
+sudo apt install ./dist/deskmon_1.0.2_amd64.deb
 # 之后从启动器搜「DeskMon / 桌面监控」即可运行
 
 # 卸载（保留 ~/.config/deskmon 用户配置）
@@ -80,4 +80,4 @@ dist/                         构建产物归档（.deb，不入库）
 
 ## 许可证
 
-GPL-2.0-or-later
+GPL-2.0
