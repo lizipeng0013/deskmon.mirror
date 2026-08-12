@@ -16,6 +16,14 @@ Deepin 社区「10亿 Token 奖池，写出属于你的 deepin 桌面插件」�
 - 单实例：重复启动时激活已有窗口
 - 无 NVIDIA 显卡时自动降级隐藏 GPU 面板
 
+## 界面预览
+
+| 浅色主题 | 深色主题 |
+| --- | --- |
+| ![DeskMon 浅色主题](docs/screenshots/light.png) | ![DeskMon 深色主题](docs/screenshots/dark.png) |
+
+右下角悬浮监控窗，完整模式展示 CPU / 内存 / GPU / 系统盘指标、60 秒趋势折线、网络速度与 IP。点击标题栏 ⊡ 可收缩为单行迷你浮动条，双击迷你条恢复完整窗口。
+
 ## 构建
 
 ```bash

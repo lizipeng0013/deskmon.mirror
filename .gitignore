@@ -6,6 +6,7 @@ obj-x86_64-linux-gnu/
 
 # deb 打包产物（dpkg-buildpackage 输出到父目录，这里兜底）
 *.deb
+*.zip
 *.changes
 *.buildinfo
 *.dsc
