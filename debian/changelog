@@ -1,3 +1,9 @@
+deskmon (1.0.2) unstable; urgency=medium
+
+  * 完整/迷你模式切换时自动贴右下角边缘（距边 4px，跟随当前屏不跨屏跳）
+
+ -- kookboy <kookboy@users.noreply.github.com>  Wed, 12 Aug 2026 11:53:18 +0800
+
 deskmon (1.0.0-1) unstable; urgency=medium
 
   * 首版发布：DTK6 原生系统监控悬浮小窗
