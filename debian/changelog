@@ -1,3 +1,11 @@
+deskmon (1.0.3) unstable; urgency=medium
+
+  * 新增 LoongArch64 (loong64) 架构交叉打包支持
+  * debian/rules: ifeq 守卫 jm-prefix，loong64 走 CMAKE_TOOLCHAIN_FILE
+  * debian/control: Build-Depends 追加 loong64 交叉编译器
+
+ -- kookboy <kookboy@users.noreply.github.com>  Wed, 13 Aug 2026 21:20:00 +0800
+
 deskmon (1.0.2) unstable; urgency=medium
 
   * 完整/迷你模式切换时自动贴右下角边缘（距边 4px，跟随当前屏不跨屏跳）

@@ -11,6 +11,10 @@ Build-Depends:
  libdtk6core-dev,
  libdtk6gui-dev,
  libdtk6widget-dev,
+# LoongArch64 交叉编译器（仅非 amd64 架构构建需要，本机 amd64 不装）
+ gcc-loongarch64-linux-gnu [!amd64],
+ g++-loongarch64-linux-gnu [!amd64],
+ libc6-dev-loong64-cross [!amd64],
 Standards-Version: 4.6.2
 Homepage: https://github.com/kookboy/deskmon
 

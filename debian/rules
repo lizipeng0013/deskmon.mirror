@@ -5,6 +5,11 @@
 #    fakeroot 通过 LD_LIBRARY_PATH 提供 libfakeroot 预加载库路径）。
 # 2) PATH：确保优先使用工具链的 cmake（系统未装 cmake 包）。
 # 系统环境已装齐 dev 包时，可整体删除下面两行 export 回退到系统默认工具链。
+#
+# ⚠️ jm-prefix 仅含 amd64 二进制，交叉构建（loong64 等）必须绕开，故用 DEB_HOST_ARCH 守卫。
+# 但 PATH/LD_LIBRARY_PATH 仍需保留：本机系统未装 cmake 包，用的是 jm-prefix 的 cmake
+# （cmake 本身是 amd64 本机程序，与目标架构无关）。
+# 仅 CMAKE_PREFIX_PATH 在交叉时必须排除，以免 CMake 误命中 amd64 版 Qt6/DTK6。
 export LD_LIBRARY_PATH := /usr/lib/x86_64-linux-gnu:$(HOME)/jm-prefix/usr/lib/x86_64-linux-gnu$(if $(LD_LIBRARY_PATH),:$(LD_LIBRARY_PATH))
 export PATH := $(HOME)/jm-prefix/usr/bin:$(PATH)
 
@@ -12,7 +17,13 @@ export PATH := $(HOME)/jm-prefix/usr/bin:$(PATH)
 	dh $@
 
 override_dh_auto_configure:
+ifeq ($(DEB_HOST_ARCH),loong64)
+	# LoongArch64 交叉构建：用 apt 交叉编译器 + 系统源 loong64 版 Qt6/DTK6，
+	# 不走 jm-prefix（那是 amd64 专用）。
+	dh_auto_configure -- -DCMAKE_TOOLCHAIN_FILE="$(CURDIR)/cmake/loong64-toolchain.cmake"
+else
 	dh_auto_configure -- -DCMAKE_PREFIX_PATH="$(HOME)/jm-prefix/usr"
+endif
 
 # 参赛发布版只分发主包，不产出独立 dbgsym 调试符号包：
 # 跳过 dh_dwz（DWARF 压缩），dh_strip 禁止自动拆分调试信息到 .debug。

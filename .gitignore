@@ -28,3 +28,7 @@ compile_commands.json
 
 # 运行时配置
 *.log
+
+# 会话/工具目录与跨架构构建树
+.zcode/
+obj-loongarch64-linux-gnu/
