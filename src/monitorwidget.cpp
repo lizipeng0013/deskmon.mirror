@@ -17,6 +17,7 @@
 
 #include <DNotifySender>
 
+#include <DAboutDialog>
 #include <DApplication>
 #include <DGuiApplicationHelper>
 #include <DBlurEffectWidget>
@@ -383,6 +384,22 @@ void MonitorWidget::setupTray()
     // 设置面板
     QAction *settingsAction = menu->addAction(tr("设置"));
     connect(settingsAction, &QAction::triggered, this, &MonitorWidget::openSettings);
+
+    // 关于（作者：kookboy，版本号来自编译宏）
+    QAction *aboutAction = menu->addAction(tr("关于"));
+    connect(aboutAction, &QAction::triggered, this, [this, tray] {
+        auto *dlg = new DAboutDialog(this);
+        dlg->setProductName(tr("DeskMon 系统监控"));
+        dlg->setProductIcon(tray->icon());
+        dlg->setVersion(QCoreApplication::applicationVersion());
+        dlg->setDescription(tr("DTK6 原生桌面系统监控悬浮小工具，"
+                               "实时显示 CPU / GPU / 内存 / 磁盘 / 网络状态。\n"
+                               "作者：kookboy"));
+        dlg->setWebsiteName(QStringLiteral("gitee.com/yngeek/deskmon"));
+        dlg->setWebsiteLink(QStringLiteral("https://gitee.com/yngeek/deskmon"));
+        dlg->exec();
+        dlg->deleteLater();
+    });
 
     menu->addSeparator();
     QAction *quitAction = menu->addAction(tr("退出"));

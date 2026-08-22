@@ -1,3 +1,12 @@
+deskmon (1.0.5) unstable; urgency=medium
+
+  * 托盘菜单新增「关于」对话框（DAboutDialog），注明作者 kookboy，
+    附项目主页链接
+  * 版本号统一由 CMake project VERSION 注入编译宏，修复 main.cpp /
+    CMakeLists 中残留的过期版本 1.0.0
+
+ -- kookboy <kookboy@users.noreply.github.com>  Sat, 22 Aug 2026 23:26:35 +0800
+
 deskmon (1.0.4) unstable; urgency=medium
 
   * 内存统计改用 /proc/meminfo 的 MemAvailable 口径，与深度系统监视器一致；

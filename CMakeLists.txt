@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(deskmon VERSION 1.0.0 LANGUAGES CXX)
+project(deskmon VERSION 1.0.5 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -41,6 +41,9 @@ target_include_directories(deskmon PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets
 )
+
+# 版本号单一来源：project VERSION → 编译宏 → 关于对话框 / applicationVersion
+target_compile_definitions(deskmon PRIVATE DESKMON_VERSION="${PROJECT_VERSION}")
 
 target_link_libraries(deskmon PRIVATE
     Qt6::Core

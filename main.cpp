@@ -13,6 +13,11 @@
 DWIDGET_USE_NAMESPACE
 DGUI_USE_NAMESPACE
 
+// 由 CMake 注入（project VERSION），关于对话框与应用版本信息共用
+#ifndef DESKMON_VERSION
+#define DESKMON_VERSION "unknown"
+#endif
+
 static bool appearanceIsDark()
 {
     QDBusInterface iface(QStringLiteral("org.deepin.dde.Appearance1"),
@@ -62,7 +67,7 @@ int main(int argc, char *argv[])
     DApplication app(argc, argv);
     app.setOrganizationName("deskmon");
     app.setApplicationName("deskmon");
-    app.setApplicationVersion("1.0.0");
+    app.setApplicationVersion(QStringLiteral(DESKMON_VERSION));
     app.setProductName(QObject::tr("DeskMon"));
     app.setApplicationDisplayName(QObject::tr("DeskMon"));
     // 目前未内置翻译资源，跳过 loadTranslator 以免空转警告（打包时如有翻译再启用）
