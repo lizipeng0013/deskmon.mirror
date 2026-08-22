@@ -97,7 +97,9 @@ QVector<ProcessInfo> ProcessMgr::list()
         const auto it = m_cpuCache.constFind(pid);
         if (it != m_cpuCache.constEnd()) {
             const qint64 dtMs = qMax<qint64>(1, now - it->second);
-            const qulonglong dj = jiffies - it->first;
+            // 有符号差分：PID 被系统复用时新进程 jiffies 可能小于残留值，
+            // 无符号减法会下溢成天文数字（被钳到 999%），负值按 0 处理
+            const qint64 dj = qMax<qint64>(0, qint64(jiffies) - qint64(it->first));
             const double jiffiesPerSec = 1000.0 * double(dj) / double(dtMs);
             info.cpuPercent = qBound(0.0, jiffiesPerSec / double(sysconf(_SC_CLK_TCK)) / double(QThread::idealThreadCount()) * 100.0, 999.0);
         }

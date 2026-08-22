@@ -1,3 +1,14 @@
+deskmon (1.0.4) unstable; urgency=medium
+
+  * 内存统计改用 /proc/meminfo 的 MemAvailable 口径，与深度系统监视器一致；
+    修复 sysinfo 无页缓存字段导致数 GB Cached 被计入已用、开机越久越偏高的问题
+  * CPU 采样补记 /proc/stat 的 steal 字段，虚拟机下不再高估使用率
+  * CPU 首次采样返回开机以来平均值，启动瞬间不再显示 0%
+  * 进程 CPU 差分改有符号计算，修复 PID 复用时偶发 999% 的问题
+  * CPU 温度显示：四舍五入、每周期只读一次 sysfs、无传感器时隐藏（不再显示 -1℃）
+
+ -- kookboy <kookboy@users.noreply.github.com>  Sat, 22 Aug 2026 23:26:35 +0800
+
 deskmon (1.0.3) unstable; urgency=medium
 
   * 新增 LoongArch64 (loong64) 架构交叉打包支持

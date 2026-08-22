@@ -69,7 +69,7 @@ private:
 
     // CPU 计算状态（从函数静态挪到成员，避免多实例互相污染）
     struct CpuTimes {
-        qulonglong user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0;
+        qulonglong user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0;
     };
     CpuTimes m_prevCpu;
     bool m_havePrevCpu = false;

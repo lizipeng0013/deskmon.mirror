@@ -607,9 +607,13 @@ void MonitorWidget::refresh()
 
     // CPU
     cpu = m_monitor->cpuUsage();
+    // 温度每 tick 只读一次（sysfs 扫描有开销），完整面板与迷你条共用；
+    // 无传感器时返回 -1，显示侧隐藏温度信息而不是「-1℃」
+    const double cpuTemp = m_monitor->cpuTemp();
+    const QString cpuTempInfo = cpuTemp >= 0 ? tr("温度 %1℃").arg(int(cpuTemp + 0.5)) : QString();
     if (cpu >= 0) {
         m_cpuRow->setValue(int(cpu + 0.5));
-        m_cpuRow->setInfo(tr("温度 %1℃").arg(int(m_monitor->cpuTemp())));
+        m_cpuRow->setInfo(cpuTempInfo);
     }
 
     // 内存
@@ -662,7 +666,7 @@ void MonitorWidget::refresh()
     if (m_miniBar && m_stack && m_stack->currentWidget() == m_miniBar) {
         if (cpu >= 0) {
             m_miniBar->setMetric(0, int(cpu + 0.5));
-            m_miniBar->setMetricInfo(0, tr("温度 %1℃").arg(int(m_monitor->cpuTemp())));
+            m_miniBar->setMetricInfo(0, cpuTempInfo);
         }
         if (memPercent >= 0) {
             m_miniBar->setMetric(1, int(memPercent + 0.5));

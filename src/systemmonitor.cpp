@@ -61,6 +61,8 @@ bool SystemMonitor::readCpuTimes(CpuTimes &t) const
     t.iowait = parts[5].toULongLong();
     t.irq = parts[6].toULongLong();
     t.softirq = parts[7].toULongLong();
+    // steal：虚拟机里被宿主占用的时间；老内核无此列，取 0
+    t.steal = parts.size() > 8 ? parts[8].toULongLong() : 0;
     return true;
 }
 
@@ -73,14 +75,22 @@ double SystemMonitor::cpuUsage()
     if (!m_havePrevCpu) {
         m_prevCpu = cur;
         m_havePrevCpu = true;
-        return 0;
+        // 首次采样：/proc/stat 是开机以来的累计值，直接算开机平均，
+        // 比显示 0% 更接近真实
+        const qulonglong idleAll = cur.idle + cur.iowait;
+        const qulonglong totalAll = cur.user + cur.nice + cur.system + cur.idle
+            + cur.iowait + cur.irq + cur.softirq + cur.steal;
+        if (totalAll == 0)
+            return 0;
+        return qBound(0.0, 100.0 * (1.0 - double(idleAll) / double(totalAll)), 100.0);
     }
 
     const qulonglong idleDelta = (cur.idle - m_prevCpu.idle) + (cur.iowait - m_prevCpu.iowait);
     const qulonglong totalDelta =
         (cur.user - m_prevCpu.user) + (cur.nice - m_prevCpu.nice) + (cur.system - m_prevCpu.system)
         + (cur.idle - m_prevCpu.idle) + (cur.iowait - m_prevCpu.iowait)
-        + (cur.irq - m_prevCpu.irq) + (cur.softirq - m_prevCpu.softirq);
+        + (cur.irq - m_prevCpu.irq) + (cur.softirq - m_prevCpu.softirq)
+        + (cur.steal - m_prevCpu.steal);
     m_prevCpu = cur;
 
     if (totalDelta == 0)
@@ -122,15 +132,36 @@ double SystemMonitor::cpuTemp() const
 
 void SystemMonitor::memoryUsage(double &percent, qint64 &usedMB, qint64 &totalMB) const
 {
-    struct sysinfo si {};
-    if (sysinfo(&si) != 0) {
-        percent = -1;
-        usedMB = totalMB = 0;
-        return;
+    // 已用 = MemTotal - MemAvailable，与深度系统监视器 / free 同口径。
+    // 不能用 sysinfo 的 freeram+bufferram+sharedram：sysinfo 没有页缓存字段，
+    // 会把数 GB 的 Cached 算进已用，且开机越久偏差越大。
+    qint64 total = -1, available = -1;
+    QFile f(QStringLiteral("/proc/meminfo"));
+    if (f.open(QIODevice::ReadOnly)) {
+        const QStringList lines = QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'));
+        for (const QString &line : lines) {
+            const qint64 kb = line.section(QLatin1Char(':'), 1)
+                                  .split(QLatin1Char(' '), Qt::SkipEmptyParts)
+                                  .value(0).toLongLong() * 1024;
+            if (line.startsWith(QLatin1String("MemTotal:")))
+                total = kb;
+            else if (line.startsWith(QLatin1String("MemAvailable:")))
+                available = kb;
+        }
     }
-    const qint64 total = qint64(si.totalram) * si.mem_unit;
-    const qint64 free = (qint64(si.freeram) + qint64(si.bufferram) + qint64(si.sharedram)) * si.mem_unit;
-    const qint64 used = total - free;
+    if (total <= 0 || available < 0) {
+        // 回退：无 MemAvailable 的老内核（<3.14）用 free+buffers 近似；
+        // shmem 是真占用不可直接回收，不计入可用
+        struct sysinfo si {};
+        if (sysinfo(&si) != 0) {
+            percent = -1;
+            usedMB = totalMB = 0;
+            return;
+        }
+        total = qint64(si.totalram) * si.mem_unit;
+        available = (qint64(si.freeram) + qint64(si.bufferram)) * si.mem_unit;
+    }
+    const qint64 used = total - available;
     totalMB = total / (1024 * 1024);
     usedMB = used / (1024 * 1024);
     percent = total > 0 ? 100.0 * double(used) / double(total) : 0;
