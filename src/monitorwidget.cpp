@@ -581,8 +581,11 @@ void MonitorWidget::setDisplayMode(const QString &mode)
 
 void MonitorWidget::positionWindow()
 {
-    const int x = m_config->positionX();
-    const int y = m_config->positionY();
+    // 位置按显示模式各自记录：迷你条不能复用完整窗的旧位置，
+    // 否则自启动恢复时迷你条会被摆到完整窗上次停留处（如桌面中心）
+    const bool mini = m_stack && m_stack->currentWidget() == m_miniBar;
+    const int x = mini ? m_config->miniPositionX() : m_config->positionX();
+    const int y = mini ? m_config->miniPositionY() : m_config->positionY();
     if (x >= 0 && y >= 0) {
         move(x, y);
         return;
@@ -614,8 +617,11 @@ void MonitorWidget::showEvent(QShowEvent *e)
 
 void MonitorWidget::savePosition()
 {
-    m_config->set(QStringLiteral("position_x"), pos().x());
-    m_config->set(QStringLiteral("position_y"), pos().y());
+    // 写入当前模式自己的位置记录（完整/迷你分开，见 positionWindow）
+    const bool mini = m_stack && m_stack->currentWidget() == m_miniBar;
+    const QString kx = mini ? QStringLiteral("mini_position_x") : QStringLiteral("position_x");
+    const QString ky = mini ? QStringLiteral("mini_position_y") : QStringLiteral("position_y");
+    m_config->setMany({{kx, pos().x()}, {ky, pos().y()}});
 }
 
 void MonitorWidget::refresh()

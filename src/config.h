@@ -27,8 +27,10 @@ public:
     // 便捷访问
     double opacity() const;
     int refreshInterval() const;
-    int positionX() const;
+    int positionX() const;              // 完整模式位置
     int positionY() const;
+    int miniPositionX() const;          // 迷你条位置（与完整模式分开记录）
+    int miniPositionY() const;
     int windowWidth() const;
     bool showGpu() const;
     bool showDisk() const;

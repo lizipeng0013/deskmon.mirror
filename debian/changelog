@@ -1,3 +1,11 @@
+deskmon (1.0.6) unstable; urgency=medium
+
+  * 修复自启动后迷你条出现在桌面中心的问题：位置记录按显示模式分开，
+    迷你条新增 mini_position_x/mini_position_y，无记录时恢复到应用
+    默认右下角，不再复用完整窗的旧位置
+
+ -- kookboy <kookboy@users.noreply.github.com>  Fri, 28 Aug 2026 21:12:45 +0800
+
 deskmon (1.0.5) unstable; urgency=medium
 
   * 托盘菜单新增「关于」对话框（DAboutDialog），注明作者 kookboy，

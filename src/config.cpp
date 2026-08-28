@@ -16,6 +16,8 @@ const QVariantMap Config::s_defaults = {
     {QStringLiteral("refresh_interval"), 1000},
     {QStringLiteral("position_x"), -1},
     {QStringLiteral("position_y"), -1},
+    {QStringLiteral("mini_position_x"), -1},
+    {QStringLiteral("mini_position_y"), -1},
     {QStringLiteral("window_width"), 220},
     {QStringLiteral("show_gpu"), true},
     {QStringLiteral("show_disk"), true},
@@ -107,6 +109,8 @@ double Config::opacity() const { return m_data.value(QStringLiteral("opacity")).
 int Config::refreshInterval() const { return m_data.value(QStringLiteral("refresh_interval")).toInt(); }
 int Config::positionX() const { return m_data.value(QStringLiteral("position_x")).toInt(); }
 int Config::positionY() const { return m_data.value(QStringLiteral("position_y")).toInt(); }
+int Config::miniPositionX() const { return m_data.value(QStringLiteral("mini_position_x")).toInt(); }
+int Config::miniPositionY() const { return m_data.value(QStringLiteral("mini_position_y")).toInt(); }
 int Config::windowWidth() const { return m_data.value(QStringLiteral("window_width")).toInt(); }
 bool Config::showGpu() const { return m_data.value(QStringLiteral("show_gpu")).toBool(); }
 bool Config::showDisk() const { return m_data.value(QStringLiteral("show_disk")).toBool(); }
