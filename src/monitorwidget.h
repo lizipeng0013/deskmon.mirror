@@ -7,10 +7,13 @@
 #include <DWidget>
 #include <DBlurEffectWidget>
 
+#include <QElapsedTimer>
+
 #include <memory>
 
 class QTimer;
 class QLabel;
+class QMoveEvent;
 class QVBoxLayout;
 class QHBoxLayout;
 class QToolButton;
@@ -47,6 +50,7 @@ public slots:
 
 protected:
     void showEvent(QShowEvent *e) override;
+    void moveEvent(QMoveEvent *e) override;
     void mousePressEvent(QMouseEvent *e) override;
     void mouseMoveEvent(QMouseEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
@@ -71,6 +75,7 @@ private:
     void notifyAlert(const QString &message);  // 系统通知发告警
     void cycleOpacity();          // 点击 ◐ 循环切换透明度
     void setDisplayMode(const QString &mode);  // 切换完整/迷你模式
+    void maybeRevertExternalMove();  // 启动窗口期内回拉被窗口管理器挪走的窗口
 
     std::unique_ptr<Config> m_config;
     std::unique_ptr<SystemMonitor> m_monitor;
@@ -112,6 +117,13 @@ private:
     bool m_gpuAvailable = false;
     bool m_cpuAlerted = false;          // 告警边沿状态
     bool m_gpuAlerted = false;
+
+    // 会话启动阶段 kwin 可能在本程序落位之后才接管窗口，按自身策略把窗口
+    // 重摆到屏幕中心（不理会已发出的 move）。记录程序请求的位置，启动
+    // 窗口期内检测到非用户操作引起的位置变动就拉回来。
+    QElapsedTimer m_aliveSince;         // 首次显示时刻（防护生效窗口起点）
+    QPoint m_lastRequestedPos;          // 最近一次程序请求的位置
+    int m_revertGen = 0;                // 回拉防抖代数
 };
 
 #endif // DESKMON_MONITORWIDGET_H

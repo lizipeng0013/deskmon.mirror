@@ -1,3 +1,11 @@
+deskmon (1.0.7) unstable; urgency=medium
+
+  * 修复自启动登录后浮动条被窗口管理器摆到桌面中心：平台窗口创建前先按
+    配置落位（WM_NORMAL_HINTS 携带 USPosition，WM 接管时不再重摆），
+    并在启动后 60s 内检测非用户操作引起的位置变动、防抖回拉记录位置
+
+ -- kookboy <kookboy@users.noreply.github.com>  Fri, 28 Aug 2026 23:02:28 +0800
+
 deskmon (1.0.6) unstable; urgency=medium
 
   * 修复自启动后迷你条出现在桌面中心的问题：位置记录按显示模式分开，

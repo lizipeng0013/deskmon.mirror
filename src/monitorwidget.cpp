@@ -48,6 +48,10 @@
 DWIDGET_USE_NAMESPACE
 DCORE_USE_NAMESPACE
 
+// 外部挪窗回拉防护的生效窗口：覆盖登录/会话启动阶段窗口管理器晚于本程序
+// 接管窗口的时间段，之后不再干预（避免与用户或其他工具争抢窗口位置）
+static constexpr int kExternalMoveGuardMs = 60000;
+
 // 电力（闪电）图标：颜色由外部设置，跟随主题活跃色
 // （全局类，配合 monitorwidget.h 的前向声明）
 class PowerIcon : public QWidget
@@ -423,8 +427,11 @@ void MonitorWidget::applyConfig()
 {
     setWindowOpacity(m_config->opacity());
     updateRowsVisibility();
-    applyStayOnTop();
+    // show 之前先按配置落位：平台窗口以最终几何创建并在 WM_NORMAL_HINTS
+    // 带 USPosition，会话启动阶段窗口管理器接管窗口时按“用户指定位置”
+    // 处理，不再把窗口重摆到屏幕中心
     positionWindow();
+    applyStayOnTop();
 }
 
 void MonitorWidget::updateRowsVisibility()
@@ -588,12 +595,14 @@ void MonitorWidget::positionWindow()
     const int y = mini ? m_config->miniPositionY() : m_config->positionY();
     if (x >= 0 && y >= 0) {
         move(x, y);
+        m_lastRequestedPos = pos();
         return;
     }
     // 默认右下角（用实际窗口尺寸，show 后调用才能取到最终值）
     if (QScreen *screen = QGuiApplication::primaryScreen()) {
         const QRect avail = screen->availableGeometry();
         move(avail.right() - width() - 20, avail.bottom() - height() - 20);
+        m_lastRequestedPos = pos();
     }
 }
 
@@ -606,13 +615,45 @@ void MonitorWidget::snapToBottomRight()
     const QRect avail = screen->availableGeometry();
     constexpr int kSnapMargin = 4;
     move(avail.right() - width() - kSnapMargin, avail.bottom() - height() - kSnapMargin);
+    m_lastRequestedPos = pos();
 }
 
 void MonitorWidget::showEvent(QShowEvent *e)
 {
     DWidget::showEvent(e);
-    // 首次显示时布局已按内容定型，此时重新定位到右下角（若未存过自定义位置）
+    if (!m_aliveSince.isValid())
+        m_aliveSince.start();
+    // 首次显示时布局已按内容定型，此时重新定位到记录位置或右下角
     positionWindow();
+}
+
+void MonitorWidget::moveEvent(QMoveEvent *e)
+{
+    DWidget::moveEvent(e);
+    maybeRevertExternalMove();
+}
+
+// 会话启动阶段 kwin 可能在本程序落位之后才接管窗口，按自身策略（如居中）
+// 重摆窗口且不理会已发出的 move。启动后 60s 内检测到非用户操作引起的
+// 位置变动，防抖 300ms 后拉回记录位置；期间用户拖拽（m_dragging）不干预。
+void MonitorWidget::maybeRevertExternalMove()
+{
+    if (!m_aliveSince.isValid() || m_aliveSince.elapsed() > kExternalMoveGuardMs)
+        return;
+    if (!isVisible() || m_dragging || m_resizing)
+        return;
+    if ((pos() - m_lastRequestedPos).manhattanLength() <= 4)
+        return;
+    const int gen = ++m_revertGen;
+    QTimer::singleShot(300, this, [this, gen] {
+        if (gen != m_revertGen || !isVisible() || m_dragging || m_resizing)
+            return;
+        if (m_aliveSince.elapsed() > kExternalMoveGuardMs)
+            return;
+        if ((pos() - m_lastRequestedPos).manhattanLength() <= 4)
+            return;
+        positionWindow();
+    });
 }
 
 void MonitorWidget::savePosition()
@@ -825,6 +866,7 @@ void MonitorWidget::mouseReleaseEvent(QMouseEvent *e)
     if (m_dragging && e->button() == Qt::LeftButton) {
         m_dragging = false;
         savePosition();
+        m_lastRequestedPos = pos();   // 用户拖动后的位置即期望位置
         e->accept();
         return;
     }
