@@ -4,6 +4,7 @@
 #include "monitorwidget.h"
 
 #include "config.h"
+#include "emojiicon.h"
 #include "systemmonitor.h"
 #include "themecolors.h"
 #include "settings_dialog.h"
@@ -373,7 +374,8 @@ void MonitorWidget::setupTray()
     });
 
     // 番茄钟（加分项）
-    QAction *pomodoroAction = menu->addAction(tr("🍅 番茄钟"));
+    QAction *pomodoroAction = menu->addAction(tr("番茄钟"));
+    pomodoroAction->setIcon(emojiIcon(0x1F345));
     pomodoroAction->setCheckable(true);
     pomodoroAction->setChecked(m_pomodoro->isVisible());
     connect(pomodoroAction, &QAction::toggled, this, [this](bool on) {

@@ -3,6 +3,7 @@
 
 #include "gpu_dialog.h"
 
+#include "emojiicon.h"
 #include "systemmonitor.h"
 #include "processmgr.h"
 #include "nvidia_gpu.h"
@@ -53,12 +54,14 @@ void GpuDialog::buildUi()
 
     // 操作行
     auto *header = new QHBoxLayout;
-    auto *refreshBtn = new DPushButton(tr("🔄 刷新"), content);
+    auto *refreshBtn = new DPushButton(tr("刷新"), content);
+    refreshBtn->setIcon(emojiIcon(0x1F504));
     refreshBtn->setFixedWidth(80);
     connect(refreshBtn, &DPushButton::clicked, this, &GpuDialog::refreshProcesses);
     header->addWidget(refreshBtn);
 
-    m_releaseAllBtn = new DPushButton(tr("💥 释放全部显存"), content);
+    m_releaseAllBtn = new DPushButton(tr("释放全部显存"), content);
+    m_releaseAllBtn->setIcon(emojiIcon(0x1F4A5));
     m_releaseAllBtn->setFixedWidth(130);
     connect(m_releaseAllBtn, &DPushButton::clicked, this, &GpuDialog::releaseAll);
     header->addWidget(m_releaseAllBtn);

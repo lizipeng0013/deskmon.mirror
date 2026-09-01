@@ -6,6 +6,10 @@ deskmon (1.0.6) unstable; urgency=medium
   * 防御会话启动阶段 kwin 重摆窗口：平台窗口创建前先按配置落位
     （WM_NORMAL_HINTS 携带 USPosition），并在启动后 60s 内检测非用户
     操作引起的位置变动、防抖回拉记录位置
+  * 修复托盘菜单番茄钟项、GPU/进程对话框刷新与释放按钮的 emoji 显示为
+    缺字方框：emoji 从菜单/按钮文字移除，改用 emoji 字体绘制的 QIcon
+    （Qt 字体回退不会自动命中 Noto Color Emoji，dde-shell 渲染托盘菜单
+    时同理）
 
  -- kookboy <kookboy@users.noreply.github.com>  Fri, 28 Aug 2026 21:12:45 +0800
 

@@ -3,6 +3,7 @@
 
 #include "process_dialog.h"
 
+#include "emojiicon.h"
 #include "processmgr.h"
 
 #include <DComboBox>
@@ -48,7 +49,8 @@ void ProcessDialog::buildUi()
 
     // 头部：刷新 + 排序 + 计数
     auto *header = new QHBoxLayout;
-    auto *refreshBtn = new DPushButton(tr("🔄 刷新"), content);
+    auto *refreshBtn = new DPushButton(tr("刷新"), content);
+    refreshBtn->setIcon(emojiIcon(0x1F504));
     refreshBtn->setFixedWidth(80);
     connect(refreshBtn, &DPushButton::clicked, this, &ProcessDialog::refreshProcesses);
     header->addWidget(refreshBtn);
