@@ -1,0 +1,47 @@
+name: Sync from Gitee (public) to GitHub
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up git
+        run: |
+          git config --global user.name "lizipeng0013"
+          git config --global user.email "lizipeng0013@163.com"
+
+      - name: Checkout GitHub repo
+        uses: actions/checkout@v3
+        with:
+          repository: lizipeng0013/deskmon.mirror
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: repo
+
+      - name: Sync from Gitee (force) + keep workflow
+        run: |
+          cd repo
+
+          # 1. 备份当前工作流文件（如果存在）
+          if [ -f .github/workflows/sync-from-gitee.yml ]; then
+            cp .github/workflows/sync-from-gitee.yml /tmp/workflow-backup.yml
+          fi
+
+          # 2. 强制同步到 Gitee 最新状态
+          git remote add upstream https://gitee.com/yngeek/deskmon.git
+          git fetch upstream
+          git reset --hard upstream/master   # Gitee 默认分支为 master
+
+          # 3. 恢复工作流文件
+          if [ -f /tmp/workflow-backup.yml ]; then
+            mkdir -p .github/workflows
+            cp /tmp/workflow-backup.yml .github/workflows/sync-from-gitee.yml
+            git add .github/workflows/sync-from-gitee.yml
+            git commit -m "Restore sync workflow after sync [skip ci]"
+          fi
+
+          # 4. 推送回 GitHub（强制覆盖）
+          git push --force-with-lease origin master   # GitHub 默认分支为 master
